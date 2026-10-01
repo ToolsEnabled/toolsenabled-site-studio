@@ -1,0 +1,470 @@
+[
+  {
+    "name": "web_pages",
+    "description": "List revision and files with up to 20 nodes each. Use file_id and node_offset for remaining nodes; offsets are revision-specific.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "File offset, default 0."
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20,
+          "description": "Files per page, default 20."
+        },
+        "file_id": {
+          "type": "string",
+          "description": "Optional file id to list its nodes.",
+          "maxLength": 8192
+        },
+        "node_offset": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Node offset, default 0."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "web_read",
+    "description": "Read up to 16,384 characters of a managed HTML/CSS/text file, with revision and next offset. Opaque assets cannot be read.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "file_id": {
+          "type": "string",
+          "description": "File id from web_pages.",
+          "maxLength": 8192
+        },
+        "start": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Inclusive character offset."
+        },
+        "end": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Exclusive character offset."
+        }
+      },
+      "required": [
+        "file_id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "web_find",
+    "description": "Search text across all files in the current working copy (case-insensitive).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Non-empty text to find.",
+          "maxLength": 8192
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum matches; default 40.",
+          "maximum": 100
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "web_css",
+    "description": "Read CSS rules whose selector contains the requested text, from the current working copy.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "selector": {
+          "type": "string",
+          "description": "Selector text, for example .hero.",
+          "maxLength": 8192
+        },
+        "file_id": {
+          "type": "string",
+          "description": "Optional CSS file id.",
+          "maxLength": 8192
+        }
+      },
+      "required": [
+        "selector"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "web_set_text",
+    "description": "Set the text of one paired HTML node. Pass expected_rev from your last read.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "file_id": {
+          "type": "string",
+          "description": "HTML file id.",
+          "maxLength": 8192
+        },
+        "node_id": {
+          "type": "string",
+          "description": "Node id.",
+          "maxLength": 8192
+        },
+        "text": {
+          "type": "string",
+          "description": "New plain text (escaped by Site Studio).",
+          "maxLength": 8192
+        },
+        "expected_rev": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Revision returned by your most recent read. Stale revisions refuse; read again."
+        }
+      },
+      "required": [
+        "file_id",
+        "node_id",
+        "text",
+        "expected_rev"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "web_set_attr",
+    "description": "Set one HTML attribute in the working copy.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "file_id": {
+          "type": "string",
+          "description": "HTML file id.",
+          "maxLength": 8192
+        },
+        "node_id": {
+          "type": "string",
+          "description": "Node id.",
+          "maxLength": 8192
+        },
+        "name": {
+          "type": "string",
+          "description": "Attribute name.",
+          "maxLength": 8192
+        },
+        "value": {
+          "type": "string",
+          "description": "Attribute value.",
+          "maxLength": 8192
+        },
+        "expected_rev": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Revision returned by your most recent read. Stale revisions refuse; read again."
+        }
+      },
+      "required": [
+        "file_id",
+        "node_id",
+        "name",
+        "value",
+        "expected_rev"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "web_css_set",
+    "description": "Set one stylesheet rule in a CSS file. declarations is the rule body, for example \"color: red; margin: 0\".",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "file_id": {
+          "type": "string",
+          "description": "CSS file id.",
+          "maxLength": 8192
+        },
+        "selector": {
+          "type": "string",
+          "description": "Full selector text.",
+          "maxLength": 8192
+        },
+        "declarations": {
+          "type": "string",
+          "description": "Declaration list without braces.",
+          "maxLength": 8192
+        },
+        "expected_rev": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Revision returned by your most recent read. Stale revisions refuse; read again."
+        }
+      },
+      "required": [
+        "file_id",
+        "selector",
+        "declarations",
+        "expected_rev"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "web_insert_section",
+    "description": "Insert a <section> fragment relative to a parent node.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "file_id": {
+          "type": "string",
+          "description": "HTML file id.",
+          "maxLength": 8192
+        },
+        "parent_id": {
+          "type": "string",
+          "description": "Parent node id.",
+          "maxLength": 8192
+        },
+        "position": {
+          "type": "string",
+          "description": "One of first, last, before, after.",
+          "maxLength": 8192,
+          "enum": [
+            "first",
+            "last",
+            "before",
+            "after"
+          ]
+        },
+        "html": {
+          "type": "string",
+          "description": "A complete <section>...</section> fragment.",
+          "maxLength": 8192
+        },
+        "expected_rev": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Revision returned by your most recent read. Stale revisions refuse; read again."
+        }
+      },
+      "required": [
+        "file_id",
+        "parent_id",
+        "position",
+        "html",
+        "expected_rev"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "web_remove",
+    "description": "Remove one node from the working copy.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "file_id": {
+          "type": "string",
+          "description": "HTML file id.",
+          "maxLength": 8192
+        },
+        "node_id": {
+          "type": "string",
+          "description": "Node id.",
+          "maxLength": 8192
+        },
+        "expected_rev": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Revision returned by your most recent read. Stale revisions refuse; read again."
+        }
+      },
+      "required": [
+        "file_id",
+        "node_id",
+        "expected_rev"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "web_move",
+    "description": "Move a node relative to another node in the same file.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "file_id": {
+          "type": "string",
+          "description": "HTML file id.",
+          "maxLength": 8192
+        },
+        "node_id": {
+          "type": "string",
+          "description": "Node to move.",
+          "maxLength": 8192
+        },
+        "parent_id": {
+          "type": "string",
+          "description": "Destination node id.",
+          "maxLength": 8192
+        },
+        "position": {
+          "type": "string",
+          "description": "One of first, last, before, after.",
+          "maxLength": 8192,
+          "enum": [
+            "first",
+            "last",
+            "before",
+            "after"
+          ]
+        },
+        "expected_rev": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Revision returned by your most recent read. Stale revisions refuse; read again."
+        }
+      },
+      "required": [
+        "file_id",
+        "node_id",
+        "parent_id",
+        "position",
+        "expected_rev"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "web_add_page",
+    "description": "Add a new HTML page to the working copy from a minimal valid document.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Safe relative .html path.",
+          "maxLength": 8192
+        },
+        "title": {
+          "type": "string",
+          "description": "Page title.",
+          "maxLength": 8192
+        },
+        "expected_rev": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Revision returned by your most recent read. Stale revisions refuse; read again."
+        }
+      },
+      "required": [
+        "path",
+        "title",
+        "expected_rev"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "web_draw",
+    "description": "Author a pure SVG asset file. Rejects scripts, foreignObject and event attributes. External references are refused unless started with --allow-external. Reference it afterwards with web_insert_section or web_set_attr.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Safe relative .svg asset path.",
+          "maxLength": 8192
+        },
+        "svg": {
+          "type": "string",
+          "description": "Complete pure SVG source.",
+          "maxLength": 8192
+        },
+        "expected_rev": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Revision returned by your most recent read. Stale revisions refuse; read again."
+        }
+      },
+      "required": [
+        "path",
+        "svg",
+        "expected_rev"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "web_screenshot_note",
+    "description": "Return the working-copy revision and file count. No screenshot is captured or inspected; use a separate visual tool for screenshots.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "web_timeline",
+    "description": "Read the working-copy timeline. Undo, redo and restore require the dashboard session.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Most recent entries; default 50.",
+          "maximum": 100
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "web_checkpoint",
+    "description": "Save a named checkpoint of the current working copy. Restore and delete are not available as MCP tools and require the dashboard session.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "expected_rev": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Current revision."
+        }
+      },
+      "required": [
+        "label",
+        "expected_rev"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "web_preview",
+    "description": "Return the loopback live-preview URL and current revision. The human dashboard controls pause, undo, restore and confirmed export. No screenshot is captured.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    }
+  }
+]

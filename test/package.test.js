@@ -1,0 +1,10 @@
+'use strict';
+const test=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const path=require('node:path');const {spawnSync}=require('node:child_process');const {fixture}=require('./helpers');
+test('package is deterministic, complete and free of runtime/provider artifacts',t=>{
+ const o=fixture(t),root=path.join(__dirname,'..'),python=process.env.PYTHON||'python3';
+ const build=name=>{const filename=path.join(o.root,name);const result=spawnSync(python,[path.join(root,'tools/package.py'),'--output',filename],{encoding:'utf8'});assert.equal(result.status,0,result.stderr);return {filename,...JSON.parse(result.stdout)};};
+ const a=build('a.zip'),b=build('b.zip');assert.equal(a.sha256,b.sha256);assert.deepEqual(fs.readFileSync(a.filename),fs.readFileSync(b.filename));
+ const names=JSON.parse(fs.readFileSync(path.join(root,'tools/package-files.json')));assert(names.includes('test/package.test.js'));for(const file of fs.readdirSync(path.join(root,'src')))assert(names.includes('src/'+file),file+' omitted');for(const file of fs.readdirSync(root).filter(f=>f.endsWith('.js')))assert(names.includes(file),file+' omitted');for(const file of fs.readdirSync(path.join(root,'test')))assert(names.includes('test/'+file),file+' omitted');
+ assert(!names.some(n=>/node_modules|(^|\/)data\/|lease\.json|state\.json|web-agent|REPORT-/.test(n)));
+ const verify=spawnSync(python,['-c','import zipfile,hashlib,sys\nz=zipfile.ZipFile(sys.argv[1]); names=z.namelist(); assert len(names)==len(set(names)); assert all(n.startswith("site-studio/") and ".." not in n.split("/") for n in names)\nfor line in z.read("site-studio/MANIFEST.sha256").decode().splitlines():\n h,n=line.split("  ",1); assert hashlib.sha256(z.read("site-studio/"+n)).hexdigest()==h\nprint(len(names))',a.filename],{encoding:'utf8'});assert.equal(verify.status,0,verify.stderr);assert.equal(Number(verify.stdout),names.length+1);
+});

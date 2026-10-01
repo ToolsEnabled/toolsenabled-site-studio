@@ -1,0 +1,23 @@
+{
+  "name": "site-studio",
+  "version": "0.1.0",
+  "description": "Build and edit static sites in an isolated working copy, with live preview and human-controlled export.",
+  "author": {
+    "name": "ToolsEnabled"
+  },
+  "interface": {
+    "displayName": "ToolsEnabled Site Studio",
+    "shortDescription": "Local static website editing",
+    "longDescription": "Connect an MCP host to a private working copy. Preview edits locally, checkpoint progress, and let the human undo or export.",
+    "developerName": "ToolsEnabled",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Improve the sample site and show me a preview."
+    ]
+  },
+  "mcpServers": "./.mcp.json"
+}

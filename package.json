@@ -1,0 +1,20 @@
+{
+  "name": "toolsenabled-site-studio",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Standalone local MCP static site editor",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "site-studio": "mcp-web.js"
+  },
+  "scripts": {
+    "start": "node mcp-web.js",
+    "preview": "node web-server.js",
+    "test": "node tools/run-tests.js",
+    "pack": "python3 tools/package.py"
+  },
+  "license": "MIT"
+}
