@@ -103,6 +103,8 @@ async function openDashboard(){
       sessionStorage.setItem('site-studio-session',(await res.json()).token);
     }
     if(!sessionStorage.getItem('site-studio-session'))throw Error('Open the private launch link from local startup diagnostics.');
+    const issued=await fetch('/api/preview-session',{method:'POST',headers:{'Content-Type':'application/json',...sessionHeaders()},body:'{}'});
+    if(!issued.ok)throw Error('Preview session unavailable. Restart Site Studio for a new link.');
     await refresh();
     const res=await fetch('/api/events',{headers:sessionHeaders()});
     if(!res.ok)throw Error('Live updates unavailable. Reload the dashboard.');

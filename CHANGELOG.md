@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.1 — Unreleased
+
+- Authenticate preview reads with a separate HttpOnly, SameSite=Strict cookie; preview URLs contain no read capability and cookies never authorize dashboard actions.
+- Rebuild preview opening tags with escaped attributes and escape retained HTML RAW text; keep referrer protections and document their limits.
+- Parse UTF-8 SVG as XML, preserve CDATA styling, and support bounded literal internal entities used by Illustrator namespace declarations.
+- Preserve legacy HTML rendering modes and named attribute entities in previews while keeping original export bytes.
+- Find overlapping whole-character Unicode matches, reject surrogate-splitting results, and accelerate searches over dense full-fold exceptions.
+- Respect CSS escapes outside strings so selector edits replace the intended rule.
+- Expand browser, authorization, XML and adversarial performance coverage; clarify cookie isolation and platform qualification limits.
+
 ## 0.1.0 — 2026-10-01
 
 - Edit static websites through sixteen local MCP tools with revision checks and Unicode search that preserves original offsets.

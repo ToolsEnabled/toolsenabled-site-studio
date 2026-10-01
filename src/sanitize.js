@@ -1,5 +1,6 @@
 'use strict';
 const RX=require('./patterns');
+const entities=require('./html-entities.json');
 const {balancedCss}=require('./css-rules');
 const HTML = new Set('a abbr address article aside b bdi bdo blockquote br caption cite code col colgroup data dd del details dfn div dl dt em figcaption figure footer h1 h2 h3 h4 h5 h6 header hgroup hr i img ins kbd li main mark nav ol p picture pre q rp rt ruby s samp section small source span strong sub summary sup table tbody td th thead time tr u ul var wbr'.split(' '));
 const SVG = new Set('svg g defs symbol use path rect circle ellipse line polyline polygon text tspan title desc lineargradient radialgradient stop clippath mask pattern image'.split(' '));
@@ -13,7 +14,7 @@ function escapeText(s) { return s.replace(RX.escapeText,c=>({'&':'&amp;','<':'&l
 function escapeAttr(s) {return escapeText(s).replace(RX.escapeQuote,'&quot;');}
 function decode(s) {
   return s.replace(RX.entity,(m,h,d,n)=> {
-    if(n) return {amp:'&',lt:'<',gt:'>',quot:'"',apos:"'"}[n.toLowerCase()];
+    if(n) return Object.hasOwn(entities,n)?entities[n]:m;
     const cp=parseInt(h||d,h?16:10); if(cp===0||cp>0x10ffff||cp>=0xd800&&cp<=0xdfff) throw Error('invalid entity'); return String.fromCodePoint(cp);
   });
 }
@@ -53,13 +54,18 @@ function attribute(name,value,{svg=false,allowExternal=false}={}) {
 }
 // Opening-tag attributes are quote-aware; comments, bogus declarations and end tags
 // use their browser boundaries. Foreign content must not hide HTML tokens as RAW text.
-function tokenize(source) {
+function tokenize(source,{xml=false}={}) {
   const out=[];let i=0,svgDepth=0,mathDepth=0;
   while(i<source.length){
     if(source[i]!=='<'){const at=source.indexOf('<',i),end=at<0?source.length:at;out.push({text:source.slice(i,end),start:i,end});i=end;continue;}
+    if(xml&&source.startsWith('<![CDATA[',i)){
+      const at=source.indexOf(']]>',i+9);if(at<0)throw Error('unterminated CDATA');
+      out.push({cdata:source.slice(i+9,at),start:i,end:at+3});i=at+3;continue;
+    }
     if(source.startsWith('<!--',i)){
       let end=i+4;
-      if(source[end]==='>')end++;
+      if(xml){const at=source.indexOf('-->',end);if(at<0)throw Error('unterminated comment');end=at+3;}
+      else if(source[end]==='>')end++;
       else if(source.startsWith('->',end))end+=2;
       else {
         for(;end<source.length;end++)if(source[end]==='>'&&(source.slice(end-2,end)==='--'||source.slice(end-3,end)==='--!'))break;
@@ -68,7 +74,15 @@ function tokenize(source) {
       out.push({comment:true,start:i,end});i=end;continue;
     }
     if(source[i+1]==='!'||source[i+1]==='?'){
-      const at=source.indexOf('>',i+2);if(at<0)throw Error('unterminated tag');
+      let at;
+      if(xml){
+        if(source[i+1]==='?'){const close=source.indexOf('?>',i+2);at=close<0?source.length:close+1;}
+        else {let quote='',subset=0;at=i+2;
+          for(;at<source.length;at++){const c=source[at];if(quote){if(c===quote)quote='';}else if(c==='"'||c==="'")quote=c;else if(c==='[')subset++;else if(c===']'&&subset)subset--;else if(c==='>'&&!subset)break;}
+        }
+        if(at===source.length)throw Error('unterminated XML declaration');
+      }else at=source.indexOf('>',i+2);
+      if(at<0)throw Error('unterminated tag');
       out.push({declaration:source.slice(i,at+1),start:i,end:at+1});i=at+1;continue;
     }
     const closing=source[i+1]==='/';let head=i+(closing?2:1);
@@ -85,7 +99,7 @@ function tokenize(source) {
     const t={tag:source.slice(begin,head).toLowerCase(),originalTag:source.slice(begin,head),closing,self,attrs:source.slice(head,self?tail-1:j),start:i,end:j+1};out.push(t);i=j+1;
     if(t.tag==='svg')svgDepth=closing?Math.max(0,svgDepth-1):svgDepth+(self?0:1);
     if(t.tag==='math')mathDepth=closing?Math.max(0,mathDepth-1):mathDepth+(self?0:1);
-    if(!closing&&!svgDepth&&!mathDepth&&RAW.has(t.tag)){
+    if(!xml&&!closing&&!svgDepth&&!mathDepth&&RAW.has(t.tag)){
       t.rawElement=true;
       const re=RX['close_'+t.tag];re.lastIndex=i;const close=re.exec(source);
       if(!close){out.push({text:source.slice(i),rawTag:t.tag,start:i,end:source.length});i=source.length;}
@@ -97,7 +111,7 @@ function tokenize(source) {
   }
   return out;
 }
-function parseAttrs(raw,{preserveCase=false}={}) {
+function parseAttrs(raw,{preserveCase=false,decodeValue=decode}={}) {
   const result=[],names=new Set();let i=0;
   while(i<raw.length){
     const before=i;while(i<raw.length&&RX.space.test(raw[i]))i++;
@@ -113,7 +127,7 @@ function parseAttrs(raw,{preserveCase=false}={}) {
       if(quote){const end=raw.indexOf(quote,i);if(end<0)throw Error('invalid attribute syntax');value=raw.slice(start,end);i=end+1;}
       else {while(i<raw.length&&!RX.unquotedAttributeEnd.test(raw[i]))i++;if(i===start)throw Error('invalid attribute syntax');value=raw.slice(start,i);}
     }else i=nameEnd;
-    result.push([preserveCase?originalName:name,decode(value)]);
+    result.push([preserveCase?originalName:name,decodeValue(value)]);
   }
   return result;
 }

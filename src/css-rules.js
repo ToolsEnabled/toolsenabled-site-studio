@@ -18,6 +18,7 @@ function* cssRules(source){
    i=end+1;continue;
   }
   if(depth===0&&start<0&&!RX.space.test(c)){start=i;segment=i;}
+  if(c==='\\'){i++;continue;}
   if(c==='"'||c==="'"){quote=c;continue;}
   if(c===';'&&depth===0){reset(i+1);continue;}
   if(c==='{'){

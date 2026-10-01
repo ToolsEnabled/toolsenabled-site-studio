@@ -18,9 +18,9 @@ test('CSS declarations refuse Unicode separators and controls other than ordinar
 module.exports={bounded};
 
 test('held unauthenticated sockets do not exclude new human requests',async t=>{
- const net=require('node:net'),http=require('node:http');const {fixture}=require('./helpers');const {createCoordinator}=require('../src/web-server');const {openSession}=require('./session-helper');
- const app=createCoordinator(fixture(t));t.after(()=>app.close());await app.listen();const {headers}=await openSession(app.launchUrl);const status=await (await fetch(app.previewUrl+'/api/status',{headers})).json();
- for(const [base,route,auth] of [[app.previewUrl,'/api/status',headers],[app.siteUrl,new URL(status.previewUrl).pathname+'/index.html',{}]]){
+ const net=require('node:net'),http=require('node:http');const {fixture}=require('./helpers');const {createCoordinator}=require('../src/web-server');const {openSession,issuePreview}=require('./session-helper');
+ const app=createCoordinator(fixture(t));t.after(()=>app.close());await app.listen();const {headers}=await openSession(app.launchUrl);const status=await (await fetch(app.previewUrl+'/api/status',{headers})).json();const preview=await issuePreview(app.previewUrl,headers);
+ for(const [base,route,auth] of [[app.previewUrl,'/api/status',headers],[app.siteUrl,new URL(status.previewUrl).pathname+'/index.html',preview.headers]]){
   const sockets=[];t.after(()=>sockets.forEach(s=>s.destroy()));
   await Promise.all(Array.from({length:48},()=>new Promise(resolve=>{const s=net.createConnection(new URL(base).port,'127.0.0.1');sockets.push(s);s.on('error',resolve);s.resume();s.once('connect',()=>{s.write('GET / HTTP/1.1\r\nHost:');resolve();});})));
   const code=await new Promise((resolve,reject)=>{const r=http.get(base+route,{agent:false,headers:auth},res=>{res.resume();res.on('end',()=>resolve(res.statusCode));});r.on('error',reject);r.setTimeout(1500,()=>r.destroy(Error('human request timed out')));});assert.equal(code,200);sockets.forEach(s=>s.destroy());
@@ -46,7 +46,7 @@ test('attribute parsing does not rescan a large trailing whitespace run',()=>{
 });
 
 test('preview transformations are cached across query variants and invalidated on commit',()=>{
- bounded(`(async()=>{const assert=require('node:assert/strict');const cleanup=[];const o=require('./test/helpers').fixture({after:fn=>cleanup.push(fn)});const preview=require('./src/preview-content');const original=preview.previewBytes;let calls=0;preview.previewBytes=(...args)=>{calls++;return original(...args);};const app=require('./src/web-server').createCoordinator(o);try{await app.listen();const base=await require('./test/session-helper').previewBase(app);for(let i=0;i<8;i++)await (await fetch(base+'/index.html?'+i)).text();assert.equal(calls,1);app.edit(require('./test/helpers').textOp(app.model,'Changed'));assert((await (await fetch(base+'/index.html')).text()).includes('Changed'));assert.equal(calls,2);}finally{await app.close();for(const fn of cleanup.reverse())await fn();}})().catch(e=>{console.error(e);process.exitCode=1;});`);
+ bounded(`(async()=>{const assert=require('node:assert/strict');const cleanup=[];const o=require('./test/helpers').fixture({after:fn=>cleanup.push(fn)});const preview=require('./src/preview-content');const original=preview.previewBytes;let calls=0;preview.previewBytes=(...args)=>{calls++;return original(...args);};const app=require('./src/web-server').createCoordinator(o);try{await app.listen();const {url:base,headers}=await require('./test/session-helper').previewSession(app);for(let i=0;i<8;i++)await (await fetch(base+'/index.html?'+i,{headers})).text();assert.equal(calls,1);app.edit(require('./test/helpers').textOp(app.model,'Changed'));assert((await (await fetch(base+'/index.html',{headers})).text()).includes('Changed'));assert.equal(calls,2);}finally{await app.close();for(const fn of cleanup.reverse())await fn();}})().catch(e=>{console.error(e);process.exitCode=1;});`);
 });
 
 test('unparseable meta refresh tags fail closed in preview bytes',()=>{
@@ -57,7 +57,7 @@ test('unparseable meta refresh tags fail closed in preview bytes',()=>{
 
 test('malformed imported URLs do not blank the served preview',async t=>{
  const fs=require('node:fs');const {fixture}=require('./helpers');const o=fixture(t);const html='<h1>Still visible</h1><img src="\\\\[logo"><img src="/\\[x">';fs.writeFileSync(path.join(o.sourceRoot,'index.html'),html);
- const app=require('../src/web-server').createCoordinator(o);t.after(()=>app.close());await app.listen();const base=await require('./session-helper').previewBase(app);const r=await fetch(base+'/index.html');assert.equal(r.status,200);assert.match(await r.text(),/Still visible/);assert.equal(app.model.files.find(f=>f.path==='index.html').source,html);
+ const app=require('../src/web-server').createCoordinator(o);t.after(()=>app.close());await app.listen();const {url:base,headers}=await require('./session-helper').previewSession(app);const r=await fetch(base+'/index.html',{headers});assert.equal(r.status,200);assert.match(await r.text(),/Still visible/);assert.equal(app.model.files.find(f=>f.path==='index.html').source,html);
 });
 
 test('case-insensitive search reports original UTF-16 offsets within a time budget',()=>{
@@ -124,7 +124,68 @@ test('no-hit Unicode web_find avoids a per-character offset map under a time bud
 test('case folding preserves the Unicode table and rejects matches inside expansions',()=>{
  const {fold,search}=require('../src/caseless-search'),{mapping}=require('../src/case-fold.json');
  for(const [c,expected] of Object.entries(mapping))assert.equal(fold(c),expected,JSON.stringify(c));
+ const mixed=Object.keys(mapping).join('')+'\u1c89\ua7cb\u{10d50}😀';assert.equal(fold(mixed),Array.from(mixed,c=>mapping[c]??c).join(''));
  assert.equal(fold('ΟΣ ΟΣΑ Straße İ ﬃ'),'οσ οσα strasse i\u0307 ffi');
  for(const [source,query] of [['ßx','sx'],['ß','s'],['ﬃ','fi'],['İ','i']])assert.deepEqual(search(source,fold(query),100),[],source+' / '+query);
  const source='😀 İ ßx ﬃ';for(const [query,offset] of [['i\u0307',3],['ssx',5],['ffi',8]])assert.equal(search(source,fold(query),1)[0].offset,offset);
+});
+
+test('caseless search retries overlapping candidates and never splits a surrogate pair',()=>{
+ const {fold,search}=require('../src/caseless-search');
+ assert.equal(search('Sß',fold('ss'),10)[0].offset,1);
+ assert.deepEqual(search('😀','\ud83d',10),[]);assert.deepEqual(search('😀','\ude00',10),[]);
+ assert.equal(search('😀X😀',fold('x😀'),10)[0].offset,2);
+});
+
+test('CSS scanning skips escaped delimiters outside strings',()=>{
+ const {applyOp}=require('../src/web-model'),{cssRules}=require('../src/css-rules');
+ for(const selector of ['.a\\;b','.a\\{b','.a\\}b','.a\\\\b']){
+  const prefix=selector+' { color: red; }\n';const source=prefix+'b { margin: 12px; }';
+  const model={root:'site',rev:0,files:[{id:'css',path:'styles.css',kind:'css',source,nodes:[]}]};
+  assert.deepEqual([...cssRules(source)].map(rule=>rule.selector),[selector,'b']);
+  const next=applyOp(model,{type:'css_rule_set',fileId:'css',expectedRev:0,selector:'b',declarations:'color: blue;'});
+  assert.equal(next.files[0].source,prefix+'b { color: blue; }');
+ }
+});
+
+test('search over dense full-fold exceptions stays within its time budget',()=>{
+ bounded(`const {call}=require('./mcp-web'),assert=require('node:assert/strict');
+ for(const c of ['ß','Σ','Ꭰ']){const source=c.repeat(Math.floor(2*1024*1024/Buffer.byteLength(c)));const app={model:{rev:0,files:Array.from({length:5},(_,i)=>({id:'f'+i,path:i+'.txt',kind:'text',source}))}};assert.deepEqual(JSON.parse(call(app,'web_find',{query:'no-hit'}).content[0].text).hits,[]);}`,4000);
+});
+
+test('preview rebuilding preserves named entities and legacy HTML doctypes',()=>{
+ const {previewBytes}=require('../src/preview-content');
+ const legacy='<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">';
+ const source=legacy+'<a title="Wait&hellip; &copy; &NotEqualTilde;" href="about.html">Next</a>';
+ const body=previewBytes({kind:'html',path:'index.html',source},'/view/test').toString();
+ assert(body.startsWith(legacy));assert(body.includes('title="Wait… © ≂̸"'));assert(!body.includes('&amp;hellip;'));
+});
+
+test('preview serializes every opening tag and escapes retained RAW text',()=>{
+ const {previewBytes}=require('../src/preview-content');
+ const hidden='</textarea><meta name=referrer content=unsafe-url>';
+ for(const head of ['<svg><foreignObject><textarea>','<svg><desc><textarea>','<math><mtext><textarea>','<svg/x><textarea>']){
+  const source=head+'<p title="'+hidden+'">X</p></textarea></foreignObject></svg>';
+  const body=previewBytes({kind:'html',path:'index.html',source},'/preview/public').toString();
+  assert(!body.includes('title="'+hidden),'raw opening tag passed through');assert(!body.includes('<meta'));
+ }
+ for(const head of ['<svg/ ><style>','<svg x=a/><style>','<svg><desc><p></svg><style>']){
+  const body=previewBytes({kind:'html',path:'index.html',source:head+'<meta name=referrer content=unsafe-url></style>'},'/preview/public').toString();assert(!body.includes('<meta'));
+ }
+});
+
+test('SVG preview handles CDATA, internal namespace entities and XML RAW names',()=>{
+ const {previewBytes}=require('../src/preview-content');
+ const render=source=>previewBytes({kind:'asset',path:'art.svg',encoding:'base64',source:Buffer.from(source).toString('base64')},'/preview/public').toString();
+ const source='<?xml version="1.0"?><!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd" [<!ENTITY ns_svg "http://www.w3.org/2000/svg"><!ENTITY ns_ai "http://ns.adobe.com/AdobeIllustrator/10.0/">]><svg xmlns="&ns_svg;" xmlns:i="&ns_ai;"><style><![CDATA[.paint { fill: red; }]]></style><rect class="paint" width="10" height="10"/></svg>';
+ const out=render(source);assert(!out.includes('<!DOCTYPE'));assert(out.includes('xmlns="http://www.w3.org/2000/svg"'));assert(out.includes('<![CDATA[.paint { fill: red; }]]>'));
+ for(const root of ['html xmlns="http://www.w3.org/1999/xhtml"','s:svg xmlns:s="http://www.w3.org/2000/svg"']){
+  const result=render('<'+root+'><title><meta xmlns="http://www.w3.org/1999/xhtml" name="referrer" content="unsafe-url"/></title></'+root.split(' ')[0]+'>');assert(!result.includes('<meta'));
+ }
+ assert.throws(()=>render('<!DOCTYPE svg [<!ENTITY e "'+'x'.repeat(4096)+'">]><svg><text>'+'&e;'.repeat(3000)+'</text></svg>'),/expansion limit/);
+ assert(render('<svg xmlns="http://www.w3.org/2000/svg"><text><![CDATA[url(/literal)]]></text></svg>').includes('<![CDATA[url(/literal)]]>'));
+ // Unsupported entity expansion is never handed to the browser's XML parser.
+ for(const declaration of ['<!ENTITY x SYSTEM "file:///etc/passwd">','<!ENTITY x "&x;&x;">','<!ENTITY % x "boom">']){
+  const out=render('<!DOCTYPE svg ['+declaration+']><svg xmlns="http://www.w3.org/2000/svg"><text>&x;</text></svg>');assert(!out.includes('<!ENTITY'));assert(out.includes('&amp;x;'));
+ }
 });

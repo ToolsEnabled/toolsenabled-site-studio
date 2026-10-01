@@ -1,6 +1,6 @@
 {
   "name": "site-studio",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Build and edit static sites in an isolated working copy, with live preview and human-controlled export.",
   "author": {
     "name": "ToolsEnabled"

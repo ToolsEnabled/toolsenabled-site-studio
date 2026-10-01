@@ -18,4 +18,5 @@ async function browser() {
   async function until(expression){for(let i=0;i<100;i++){if(await evaluate(expression))return;await new Promise(r=>setTimeout(r,30));}throw Error('Browser condition failed: '+expression);}
   return {send,evaluate,until,close,on(method,listener){if(!listeners.has(method))listeners.set(method,new Set());listeners.get(method).add(listener);return ()=>listeners.get(method).delete(listener);},navigate:async url=>{await send('Page.navigate',{url});await until('document.readyState === "complete"');}};
 }
-module.exports={browser};
+async function browserPreview(b,app){await b.navigate(app.launchUrl);await b.until('document.getElementById("status").textContent.includes("Revision 0")');return b.evaluate('state.previewUrl');}
+module.exports={browser,browserPreview};

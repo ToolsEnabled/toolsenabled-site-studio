@@ -24,10 +24,16 @@ function createCoordinator(options = {}, preparedStore) {
   const store = preparedStore || createStore(options);
   const token = crypto.randomBytes(32).toString('hex');
   const readCapability = crypto.randomBytes(32).toString('hex');
-  const previewPrefix='/view/'+readCapability;
+  const previewId=crypto.randomBytes(12).toString('hex');
+  const previewPrefix='/preview/'+previewId;
+  const previewCookie='site_studio_preview_'+previewId;
   const launchCapability = crypto.randomBytes(32).toString('hex');
   let launchConsumed = false;
   const equal = (a,b) => typeof a === 'string' && Buffer.byteLength(a) === Buffer.byteLength(b) && crypto.timingSafeEqual(Buffer.from(a),Buffer.from(b));
+  const hasPreview = req => {
+    const matches=(req.headers.cookie||'').split(';').map(part=>part.trim()).filter(part=>part.startsWith(previewCookie+'='));
+    return matches.length===1&&equal(matches[0].slice(previewCookie.length+1),readCapability);
+  };
   const hasSession = req => launchConsumed && equal(req.headers['x-site-studio-control'],token);
   const nonce = crypto.randomBytes(24).toString('base64');
   const clients = new Set();
@@ -86,7 +92,7 @@ function createCoordinator(options = {}, preparedStore) {
       const pathname = decodeURIComponent(raw);
       if (isPreview) {
         if (req.method !== 'GET') return json(res,405,{error:'preview is read-only'});
-        if(!pathname.startsWith(previewPrefix+'/'))return json(res,403,{error:'preview capability required'});
+        if(!pathname.startsWith(previewPrefix+'/')||!hasPreview(req))return json(res,403,{error:'preview capability required'});
         return serveSite(res,pathname.slice(previewPrefix.length+1));
       }
       if (pathname === '/open' && new URL(req.url,origin()).search) return json(res,403,{error:'Launch secrets belong in the URL fragment.'});
@@ -114,11 +120,16 @@ function createCoordinator(options = {}, preparedStore) {
       }
       if (req.method === 'POST') {
         if (req.headers['content-type'] !== 'application/json') return json(res,415,{error:'application/json required'});
-        if (pathname !== '/api/control') return json(res,404,{error:'not found'});
+        if (!['/api/control','/api/preview-session'].includes(pathname)) return json(res,404,{error:'not found'});
         if (!hasSession(req)) return json(res,403,{error:'dashboard session required'});
         if (req.headers.origin !== origin()) return json(res,403,{error:'human same-origin action required'});
         const body = await readJson(req);
         if (closing) return json(res,503,{error:'closing'});
+        if(pathname==='/api/preview-session'){
+          if(Object.keys(body).length)return json(res,400,{error:'empty JSON object required'});
+          res.setHeader('Set-Cookie',previewCookie+'='+readCapability+'; Path='+previewPrefix+'/; HttpOnly; SameSite=Strict');
+          return json(res,200,{previewUrl:siteOrigin()+previewPrefix});
+        }
         const {action,...args} = body;
         const result = store.human(action,args);
         notify();

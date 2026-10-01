@@ -1,5 +1,5 @@
 'use strict';
-const test=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const path=require('node:path');const {fixture,textOp}=require('./helpers');const {createCoordinator}=require('../web-server');const {browser}=require('./browser-helper');
+const test=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const path=require('node:path');const {fixture,textOp}=require('./helpers');const {createCoordinator}=require('../web-server');const {browser,browserPreview}=require('./browser-helper');
 test('headless dashboard live refresh accessibility human controls and inert preview',async t=>{
  const o=fixture(t);fs.appendFileSync(path.join(o.sourceRoot,'index.html'),'<script>document.body.dataset.executed="yes";fetch("/api/status");</script>');const app=createCoordinator(o);t.after(()=>app.close());await app.listen();const b=await browser();t.after(()=>b.close());await b.navigate(app.launchUrl);await b.until('document.getElementById("status").textContent.includes("Revision 0")');
  assert(!await b.evaluate('document.cookie.includes("site_studio_")'),'HttpOnly session is not readable by dashboard JavaScript');
@@ -17,10 +17,10 @@ test('headless dashboard live refresh accessibility human controls and inert pre
  await b.close();await app.close();
 });
 test('preview supports root-relative styles and navigation on its own origin',async t=>{
- const o=fixture(t);fs.writeFileSync(path.join(o.sourceRoot,'index.html'),'<html><head><link rel="stylesheet" href="/styles.css"></head><body><h1>Root styles</h1><a href="/nested/about.html">About</a></body></html>');const app=createCoordinator(o);t.after(()=>app.close());await app.listen();assert(app.siteUrl,'preview needs its own site origin');const b=await browser();t.after(()=>b.close());const preview=await require('./session-helper').previewBase(app);await b.navigate(preview+'/');assert.equal(await b.evaluate('getComputedStyle(document.querySelector("h1")).color'),'rgb(0, 0, 128)');await b.evaluate('document.querySelector("a").click()');await b.until('document.querySelector("h1")?.textContent === "About"');assert.equal((await fetch(app.siteUrl+'/api/status')).status,403);assert.equal((await fetch(app.siteUrl+'/',{headers:{Origin:'https://evil.test'}})).status,403);await b.close();await app.close();
+ const o=fixture(t);fs.writeFileSync(path.join(o.sourceRoot,'index.html'),'<html><head><link rel="stylesheet" href="/styles.css"></head><body><h1>Root styles</h1><a href="/nested/about.html">About</a></body></html>');const app=createCoordinator(o);t.after(()=>app.close());await app.listen();assert(app.siteUrl,'preview needs its own site origin');const b=await browser();t.after(()=>b.close());const preview=await browserPreview(b,app);await b.navigate(preview+'/');assert.equal(await b.evaluate('getComputedStyle(document.querySelector("h1")).color'),'rgb(0, 0, 128)');await b.evaluate('document.querySelector("a").click()');await b.until('document.querySelector("h1")?.textContent === "About"');assert.equal((await fetch(app.siteUrl+'/api/status')).status,403);assert.equal((await fetch(app.siteUrl+'/',{headers:{Origin:'https://evil.test'}})).status,403);await b.close();await app.close();
 });
 test('included two-page sample renders at desktop and mobile widths',async t=>{
- const o=fixture(t);fs.rmSync(o.sourceRoot,{recursive:true});fs.cpSync(path.join(__dirname,'../site'),o.sourceRoot,{recursive:true});const app=createCoordinator(o);t.after(()=>app.close());await app.listen();const b=await browser();t.after(()=>b.close());const preview=await require('./session-helper').previewBase(app);await b.navigate(preview+'/index.html');assert.match(await b.evaluate('document.querySelector("h1").textContent'),/Good design starts/);assert.equal(await b.evaluate('getComputedStyle(document.body).backgroundColor'),'rgb(243, 240, 231)');
+ const o=fixture(t);fs.rmSync(o.sourceRoot,{recursive:true});fs.cpSync(path.join(__dirname,'../site'),o.sourceRoot,{recursive:true});const app=createCoordinator(o);t.after(()=>app.close());await app.listen();const b=await browser();t.after(()=>b.close());const preview=await browserPreview(b,app);await b.navigate(preview+'/index.html');assert.match(await b.evaluate('document.querySelector("h1").textContent'),/Good design starts/);assert.equal(await b.evaluate('getComputedStyle(document.body).backgroundColor'),'rgb(243, 240, 231)');
  if(process.env.SITE_STUDIO_EVIDENCE_DIR){const shot=await b.send('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(process.env.SITE_STUDIO_EVIDENCE_DIR,'sample-desktop.png'),Buffer.from(shot.data,'base64'));}
  await b.send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});assert(await b.evaluate('document.documentElement.scrollWidth <= window.innerWidth'));if(process.env.SITE_STUDIO_EVIDENCE_DIR){const shot=await b.send('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(process.env.SITE_STUDIO_EVIDENCE_DIR,'sample-mobile.png'),Buffer.from(shot.data,'base64'));}await b.navigate(preview+'/about.html');assert.match(await b.evaluate('document.querySelector("h1").textContent'),/Listen closely/);await b.close();await app.close();
 });
@@ -30,9 +30,9 @@ test('another loopback port receives cookies but cannot recover the dashboard se
  let stolen='';const foreign=http.createServer((req,res)=>{stolen=req.headers.cookie||'';res.end('<h1>Other origin</h1>');});await new Promise(r=>foreign.listen(0,'127.0.0.1',r));let b;t.after(async()=>{await b?.close();foreign.closeAllConnections();await new Promise(r=>foreign.close(r));});
  b=await browser();await b.navigate(app.launchUrl);await b.until('document.getElementById("status").textContent.includes("Revision 0")');
  assert.equal(await b.evaluate('location.hash'),'');assert.equal(await b.evaluate('window.siteStudioControl'),undefined);
- const token=await b.evaluate('sessionStorage.getItem("site-studio-session")');assert.match(token,/^[a-f0-9]{64}$/);
+ const token=await b.evaluate('sessionStorage.getItem("site-studio-session")');assert.match(token,/^[a-f0-9]{64}$/);const preview=await b.evaluate('state.previewUrl');
  await b.evaluate('document.cookie="site_studio_old=legacy-cookie; SameSite=Strict; Path=/"');
- await b.navigate('http://127.0.0.1:'+foreign.address().port+'/');assert.match(stolen,/legacy-cookie/);assert.equal(await b.evaluate('sessionStorage.getItem("site-studio-session")'),null);
+ await b.navigate('http://127.0.0.1:'+foreign.address().port+new URL(preview).pathname+'/other');assert.match(stolen,/legacy-cookie/);assert.match(stolen,/site_studio_preview_[a-f0-9]{24}=[a-f0-9]{64}/);assert(!stolen.includes(token));assert.equal((await fetch(preview+'/index.html',{headers:{Cookie:stolen}})).status,200);assert.equal(await b.evaluate('sessionStorage.getItem("site-studio-session")'),null);
  const page=await (await fetch(app.previewUrl+'/',{headers:{Cookie:stolen}})).text();assert(!page.includes(token));
  assert.equal((await fetch(app.previewUrl+'/api/control',{method:'POST',headers:{Origin:app.previewUrl,Cookie:stolen,'Content-Type':'application/json'},body:'{"action":"pause","expectedRev":0}'})).status,403);assert.equal(app.status.paused,false);
  await b.navigate(app.previewUrl+'/');await b.until('document.getElementById("status").textContent.includes("Revision 0")');assert.equal(await b.evaluate('sessionStorage.getItem("site-studio-session")'),token);
@@ -47,7 +47,7 @@ test('browser HTTPS requests never carry the preview capability in Referer',asyn
   'image.svg':'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><image width="20" height="20" referrerpolicy="unsafe-url" href="'+base+'/svg"/></svg>'
  };
  for(const [name,source] of Object.entries(pages))fs.writeFileSync(path.join(o.sourceRoot,name),source);
- const app=createCoordinator({...o,allowExternal:true});t.after(()=>app.close());await app.listen();const preview=await require('./session-helper').previewBase(app);const b=await browser();t.after(()=>b.close());
+ const app=createCoordinator({...o,allowExternal:true});t.after(()=>app.close());await app.listen();const b=await browser();t.after(()=>b.close());const preview=await browserPreview(b,app);
  b.on('Fetch.requestPaused',event=>{
   const {request,requestId}=event;seen.push({path:new URL(request.url).pathname,referer:Object.entries(request.headers).find(([k])=>k.toLowerCase()==='referer')?.[1]});
   const redirect=request.url.endsWith('/redirect');
@@ -83,7 +83,7 @@ test('browser neutralizes referrer overrides across imported parser-differential
   ['anchor-rel','<a href="'+base+'/anchor-rel" rel="opener" referrerpolicy="unsafe-url">Go</a>'],
  ];
  for(const [id,source,ext='html'] of cases)fs.writeFileSync(path.join(o.sourceRoot,id+'.'+ext),source);
- const seen=[],app=createCoordinator({...o,allowExternal:true});t.after(()=>app.close());await app.listen();const preview=await require('./session-helper').previewBase(app);const b=await browser();t.after(()=>b.close());let failure;
+ const seen=[],app=createCoordinator({...o,allowExternal:true});t.after(()=>app.close());await app.listen();const b=await browser();t.after(()=>b.close());const preview=await browserPreview(b,app);let failure;
  b.on('Fetch.requestPaused',event=>{seen.push({path:new URL(event.request.url).pathname,referer:Object.entries(event.request.headers).find(([k])=>k.toLowerCase()==='referer')?.[1]});void b.send('Fetch.fulfillRequest',{requestId:event.requestId,responseCode:200,responseHeaders:[{name:'Content-Type',value:event.request.url.endsWith('stylesheet-policy')?'text/css':'image/png'}],body:''}).catch(e=>{failure=e;});});
  await b.send('Fetch.enable',{patterns:[{urlPattern:base+'/*',requestStage:'Request'}]});
  const leaks=[],missing=[],relMissing=[];
@@ -98,4 +98,28 @@ test('browser neutralizes referrer overrides across imported parser-differential
   assert.equal(fs.readFileSync(path.join(o.sourceRoot,id+'.'+ext),'utf8'),source);
  }
  assert.deepEqual(leaks,[],'capability-bearing Referer on: '+leaks.join(', '));assert.deepEqual(relMissing,[]);assert.deepEqual(missing,[],'fixture did not make a request: '+missing.join(', '));
+});
+
+test('preview preserves legacy rendering mode and named attribute entities',async t=>{
+ const o=fixture(t),source='<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"><html><body><a title="Wait&hellip; &copy;" href="about.html">Next</a></body></html>';
+ fs.writeFileSync(path.join(o.sourceRoot,'index.html'),source);const app=createCoordinator(o);t.after(()=>app.close());await app.listen();const b=await browser();t.after(()=>b.close());const preview=await browserPreview(b,app);await b.navigate(preview+'/index.html');assert.deepEqual(await b.evaluate('({mode:document.compatMode,title:document.querySelector("a").title})'),{mode:'BackCompat',title:'Wait… ©'});assert.equal(fs.readFileSync(path.join(o.sourceRoot,'index.html'),'utf8'),source);
+});
+
+test('SVG CDATA styling and Illustrator namespace subsets render without XML errors',async t=>{
+ const o=fixture(t);const source='<?xml version="1.0"?><!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd" [<!ENTITY ns_svg "http://www.w3.org/2000/svg"><!ENTITY ns_ai "http://ns.adobe.com/AdobeIllustrator/10.0/">]><svg xmlns="&ns_svg;" xmlns:i="&ns_ai;" width="20" height="20"><style><![CDATA[.paint { fill: red; }]]></style><rect class="paint" width="10" height="10"/></svg>';
+ fs.writeFileSync(path.join(o.sourceRoot,'art.svg'),source);const app=createCoordinator(o);t.after(()=>app.close());await app.listen();const b=await browser();t.after(()=>b.close());const preview=await browserPreview(b,app);await b.navigate(preview+'/art.svg');assert.equal(await b.evaluate('document.querySelector("parsererror")?.textContent'),undefined);assert.equal(await b.evaluate('getComputedStyle(document.querySelector("rect")).fill'),'rgb(255, 0, 0)');assert.equal(fs.readFileSync(path.join(o.sourceRoot,'art.svg'),'utf8'),source);
+});
+
+test('preview URL and hostile foreign markup cannot disclose the cookie read capability',async t=>{
+ const o=fixture(t),remote='https://site-studio.invalid';const meta='<meta name="referrer" content="unsafe-url">';const cases=[];
+ for(const [id,head] of [['foreign','<svg><foreignObject><textarea>'],['desc','<svg><desc><textarea>'],['math','<math><mtext><textarea>'],['slash','<svg/x><textarea>']])cases.push([id,head+'<p title=\'</textarea>'+meta+'\'>X</p></textarea></foreignObject></desc></svg></mtext></math><img src="'+remote+'/'+id+'">','html']);
+ for(const [id,head] of [['spaced-self','<svg/ >'],['attr-self','<svg x=a/>'],['ignored-end','<svg><desc><p></svg>']])cases.push([id,head+'<style>'+meta+'</style></p></desc></svg><img src="'+remote+'/'+id+'">','html']);
+ for(const [id,root] of [['xhtml','html xmlns="http://www.w3.org/1999/xhtml"'],['prefixed','s:svg xmlns:s="http://www.w3.org/2000/svg"']])for(const raw of ['title','style'])cases.push([id+'-'+raw,'<'+root+'><'+raw+'><meta xmlns="http://www.w3.org/1999/xhtml" name="referrer" content="unsafe-url"/></'+raw+'><image xmlns="http://www.w3.org/2000/svg" width="1" height="1" href="'+remote+'/'+id+'-'+raw+'"/></'+root.split(' ')[0]+'>','svg']);
+ for(const [id,source,ext] of cases)fs.writeFileSync(path.join(o.sourceRoot,id+'.'+ext),source);
+ const app=createCoordinator({...o,allowExternal:true});t.after(()=>app.close());await app.listen();const b=await browser();t.after(()=>b.close());await b.navigate(app.launchUrl);await b.until('document.getElementById("status").textContent.includes("Revision 0")');const preview=await b.evaluate('state.previewUrl');
+ const cookies=(await b.send('Network.getAllCookies')).cookies;const cookie=cookies.find(c=>c.name.startsWith('site_studio_preview_'));assert(cookie,'preview uses a cookie, not a URL capability');assert(cookie.httpOnly);assert.equal(cookie.sameSite,'Strict');assert.equal(cookie.path,new URL(preview).pathname+'/');assert(!preview.includes(cookie.value));assert.equal(await b.evaluate('document.cookie.includes("site_studio_preview_")'),false);
+ const seen=[];let failure;b.on('Fetch.requestPaused',e=>{seen.push(e.request);void b.send('Fetch.fulfillRequest',{requestId:e.requestId,responseCode:200,responseHeaders:[{name:'Content-Type',value:'image/png'}],body:''}).catch(error=>{failure=error;});});await b.send('Fetch.enable',{patterns:[{urlPattern:remote+'/*',requestStage:'Request'}]});
+ for(const [id,source,ext] of cases){const count=seen.length;await b.navigate(preview+'/'+id+'.'+ext);const end=Date.now()+500;while(seen.length===count&&Date.now()<end)await new Promise(r=>setTimeout(r,10));assert(seen.length>count,'external request observed for '+id);assert.equal(await b.evaluate('document.cookie.includes("site_studio_preview_")'),false);assert.equal(fs.readFileSync(path.join(o.sourceRoot,id+'.'+ext),'utf8'),source);}
+ if(failure)throw failure;for(const request of seen){assert(!JSON.stringify(request).includes(cookie.value));assert.equal(Object.entries(request.headers).find(([k])=>k.toLowerCase()==='referer'),undefined,request.url);}
+ assert.equal((await fetch(preview+'/index.html')).status,403,'copied URL alone grants no read access');
 });

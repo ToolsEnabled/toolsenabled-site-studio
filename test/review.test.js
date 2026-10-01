@@ -75,10 +75,10 @@ test('saved fingerprints migrate across locales without accepting original drift
 });
 
 test('preview drafts need a separate read capability and controller aliases refuse',async t=>{
- const {fixture,textOp}=require('./helpers');const {createCoordinator}=require('../web-server');const {openSession}=require('./session-helper');const app=createCoordinator(fixture(t));t.after(()=>app.close());await app.listen();app.edit(textOp(app.model,'Private draft'));
+ const {fixture,textOp}=require('./helpers');const {createCoordinator}=require('../web-server');const {openSession,issuePreview}=require('./session-helper');const app=createCoordinator(fixture(t));t.after(()=>app.close());await app.listen();app.edit(textOp(app.model,'Private draft'));
  for(const url of [app.siteUrl+'/',app.siteUrl+'/index.html',app.previewUrl+'/site/index.html'])assert.equal((await fetch(url)).status,403,url);
- const {headers}=await openSession(app.launchUrl);const status=await (await fetch(app.previewUrl+'/api/status',{headers})).json();assert.match(status.previewUrl,/\/view\/[a-f0-9]{64}$/);
- const page=await fetch(status.previewUrl+'/index.html');assert.equal(page.status,200);assert.match(await page.text(),/Private draft/);assert.equal((await fetch(status.previewUrl.replace(/.$/,'x')+'/index.html')).status,403);
+ const {headers}=await openSession(app.launchUrl);const status=await (await fetch(app.previewUrl+'/api/status',{headers})).json();assert.match(status.previewUrl,/\/preview\/[a-f0-9]{24}$/);const preview=await issuePreview(app.previewUrl,headers);
+ const page=await fetch(status.previewUrl+'/index.html',{headers:preview.headers});assert.equal(page.status,200);assert.match(await page.text(),/Private draft/);assert.equal((await fetch(status.previewUrl.replace(/.$/,'x')+'/index.html')).status,403);
 });
 
 test('capability previews rewrite local HTML and CSS references without changing exports',()=>{
@@ -90,8 +90,8 @@ test('capability previews rewrite local HTML and CSS references without changing
 });
 
 test('preview reads use an immutable snapshot and partial headers expire promptly',async t=>{
- const {fixture}=require('./helpers');const {createCoordinator}=require('../web-server');const {previewBase}=require('./session-helper');const app=createCoordinator(fixture(t));t.after(()=>app.close());await app.listen();const base=await previewBase(app);
- const clone=global.structuredClone;let clones=0;global.structuredClone=(...args)=>{clones++;return clone(...args);};try{for(const route of ['/index.html','/missing.html'])await (await fetch(base+route)).arrayBuffer();assert.equal(clones,0);}finally{global.structuredClone=clone;}
+ const {fixture}=require('./helpers');const {createCoordinator}=require('../web-server');const {previewSession}=require('./session-helper');const app=createCoordinator(fixture(t));t.after(()=>app.close());await app.listen();const {url:base,headers}=await previewSession(app);
+ const clone=global.structuredClone;let clones=0;global.structuredClone=(...args)=>{clones++;return clone(...args);};try{for(const route of ['/index.html','/missing.html'])await (await fetch(base+route,{headers})).arrayBuffer();assert.equal(clones,0);}finally{global.structuredClone=clone;}
  assert.equal(app.previewServer.maxConnections,undefined);assert.equal(app.previewServer.timeout,2000);assert(app.previewServer.connectionsCheckingInterval<=250);
  const net=require('node:net');const socket=net.createConnection({host:'127.0.0.1',port:new URL(app.siteUrl).port});t.after(()=>socket.destroy());socket.on('error',()=>{});socket.resume();const start=Date.now();socket.write('GET / HTTP/1.1\r\nHost:');
  await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('partial header socket exceeded four seconds')),4000);socket.once('close',()=>{clearTimeout(timer);resolve();});});assert(Date.now()-start<4000);
