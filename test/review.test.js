@@ -78,7 +78,7 @@ test('preview drafts need a separate read capability and controller aliases refu
  const {fixture,textOp}=require('./helpers');const {createCoordinator}=require('../web-server');const {openSession,issuePreview}=require('./session-helper');const app=createCoordinator(fixture(t));t.after(()=>app.close());await app.listen();app.edit(textOp(app.model,'Private draft'));
  for(const url of [app.siteUrl+'/',app.siteUrl+'/index.html',app.previewUrl+'/site/index.html'])assert.equal((await fetch(url)).status,403,url);
  const {headers}=await openSession(app.launchUrl);const status=await (await fetch(app.previewUrl+'/api/status',{headers})).json();assert.match(status.previewUrl,/\/preview\/[a-f0-9]{24}$/);const preview=await issuePreview(app.previewUrl,headers);
- const page=await fetch(status.previewUrl+'/index.html',{headers:preview.headers});assert.equal(page.status,200);assert.match(await page.text(),/Private draft/);assert.equal((await fetch(status.previewUrl.replace(/.$/,'x')+'/index.html')).status,403);
+ const page=await fetch(preview.url+'/index.html',{headers:preview.headers});assert.equal(page.status,200);assert.match(await page.text(),/Private draft/);assert.equal((await fetch(status.previewUrl.replace(/.$/,'x')+'/index.html')).status,403);
 });
 
 test('capability previews rewrite local HTML and CSS references without changing exports',()=>{

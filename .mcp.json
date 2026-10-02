@@ -3,8 +3,18 @@
     "site-studio": {
       "command": "node",
       "args": [
-        "${CLAUDE_PLUGIN_ROOT}/mcp-web.js"
-      ]
+        "${CLAUDE_PLUGIN_ROOT}/mcp-web.js",
+        "--site",
+        "${user_config.site_directory}",
+        "--data-dir",
+        "${user_config.data_directory}",
+        "--export-dir",
+        "${user_config.export_directory}"
+      ],
+      "env": {
+        "SITE_STUDIO_ROOT": "${user_config.site_directory}",
+        "SITE_STUDIO_DATA": "${user_config.data_directory}"
+      }
     }
   }
 }

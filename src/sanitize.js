@@ -1,6 +1,7 @@
 'use strict';
 const RX=require('./patterns');
 const entities=require('./html-entities.json');
+const legacyEntities=new Set(require('./html-legacy-entities.json'));
 const {balancedCss}=require('./css-rules');
 const HTML = new Set('a abbr address article aside b bdi bdo blockquote br caption cite code col colgroup data dd del details dfn div dl dt em figcaption figure footer h1 h2 h3 h4 h5 h6 header hgroup hr i img ins kbd li main mark nav ol p picture pre q rp rt ruby s samp section small source span strong sub summary sup table tbody td th thead time tr u ul var wbr'.split(' '));
 const SVG = new Set('svg g defs symbol use path rect circle ellipse line polyline polygon text tspan title desc lineargradient radialgradient stop clippath mask pattern image'.split(' '));
@@ -12,12 +13,34 @@ const SVG_ATTRS = new Set('width height xmlns viewbox preserveaspectratio x y x1
 const camel={viewbox:'viewBox',preserveaspectratio:'preserveAspectRatio',lineargradient:'linearGradient',radialgradient:'radialGradient',clippath:'clipPath',gradientunits:'gradientUnits',gradienttransform:'gradientTransform',patternunits:'patternUnits',patterntransform:'patternTransform',patterncontentunits:'patternContentUnits',clippathunits:'clipPathUnits',maskunits:'maskUnits',maskcontentunits:'maskContentUnits'};
 function escapeText(s) { return s.replace(RX.escapeText,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
 function escapeAttr(s) {return escapeText(s).replace(RX.escapeQuote,'&quot;');}
-function decode(s) {
-  return s.replace(RX.entity,(m,h,d,n)=> {
-    if(n) return Object.hasOwn(entities,n)?entities[n]:m;
-    const cp=parseInt(h||d,h?16:10); if(cp===0||cp>0x10ffff||cp>=0xd800&&cp<=0xdfff) throw Error('invalid entity'); return String.fromCodePoint(cp);
-  });
+function decode(s,{attribute=false}={}) {
+  const alnum=c=>c>=48&&c<=57||c>=65&&c<=90||c>=97&&c<=122;
+  const parts=[];let start=0;
+  for(let at=s.indexOf('&');at>=0;at=s.indexOf('&',at+1)){
+    let end=at+1,value;
+    if(s[end]==='#'){
+      end++;const hex=s[end]==='x'||s[end]==='X';if(hex)end++;
+      const begin=end;let cp=0;
+      for(;end<s.length;end++){
+        const c=s.charCodeAt(end),digit=c>=48&&c<=57?c-48:hex&&c>=65&&c<=70?c-55:hex&&c>=97&&c<=102?c-87:-1;
+        if(digit<0)break;cp=Math.min(0x110000,cp*(hex?16:10)+digit);
+      }
+      if(end===begin)continue;
+      if(cp===0||cp>0x10ffff||cp>=0xd800&&cp<=0xdfff)throw Error('invalid entity');
+      value=String.fromCodePoint(cp);if(s[end]===';')end++;
+    }else{
+      let name='';
+      for(let i=end;i<s.length&&i<at+33&&alnum(s.charCodeAt(i));i++){
+        name+=s[i];
+        if(s[i+1]===';'&&Object.hasOwn(entities,name)){value=entities[name];end=i+2;break;}
+        if(legacyEntities.has(name)&&!(attribute&&(alnum(s.charCodeAt(i+1))||s[i+1]==='='))){value=entities[name];end=i+1;}
+      }
+    }
+    if(value!==undefined){parts.push(s.slice(start,at),value);start=end;at=end-1;}
+  }
+  return parts.length?(parts.push(s.slice(start)),parts.join('')):s;
 }
+function decodeAttribute(value){return decode(value,{attribute:true});}
 function safeUrl(value, allowExternal=false, fragmentOnly=false) {
   if(typeof value!=='string'||!value||RX.unsafeReference.test(value)) throw Error('unsafe reference');
   if(value.startsWith('#')) { if(!RX.fragmentReference.test(value)) throw Error('unsafe fragment'); return value; }
@@ -54,9 +77,10 @@ function attribute(name,value,{svg=false,allowExternal=false}={}) {
 }
 // Opening-tag attributes are quote-aware; comments, bogus declarations and end tags
 // use their browser boundaries. Foreign content must not hide HTML tokens as RAW text.
-function tokenize(source,{xml=false}={}) {
+function tokenize(source,{xml=false,maxTokens=Infinity}={}) {
   const out=[];let i=0,svgDepth=0,mathDepth=0;
   while(i<source.length){
+    if(out.length>=maxTokens)throw require('./preview-limits').limit();
     if(source[i]!=='<'){const at=source.indexOf('<',i),end=at<0?source.length:at;out.push({text:source.slice(i,end),start:i,end});i=end;continue;}
     if(xml&&source.startsWith('<![CDATA[',i)){
       const at=source.indexOf(']]>',i+9);if(at<0)throw Error('unterminated CDATA');
@@ -109,9 +133,10 @@ function tokenize(source,{xml=false}={}) {
       }
     }
   }
+  if(out.length>maxTokens)throw require('./preview-limits').limit();
   return out;
 }
-function parseAttrs(raw,{preserveCase=false,decodeValue=decode}={}) {
+function parseAttrs(raw,{preserveCase=false,decodeValue=decodeAttribute}={}) {
   const result=[],names=new Set();let i=0;
   while(i<raw.length){
     const before=i;while(i<raw.length&&RX.space.test(raw[i]))i++;
@@ -127,7 +152,9 @@ function parseAttrs(raw,{preserveCase=false,decodeValue=decode}={}) {
       if(quote){const end=raw.indexOf(quote,i);if(end<0)throw Error('invalid attribute syntax');value=raw.slice(start,end);i=end+1;}
       else {while(i<raw.length&&!RX.unquotedAttributeEnd.test(raw[i]))i++;if(i===start)throw Error('invalid attribute syntax');value=raw.slice(start,i);}
     }else i=nameEnd;
-    result.push([preserveCase?originalName:name,decodeValue(value)]);
+    const decoded=decodeValue(value,preserveCase?originalName:name);
+    // Preview decoders may omit one attribute without dropping its whole tag.
+    if(decoded!==null)result.push([preserveCase?originalName:name,decoded]);
   }
   return result;
 }
@@ -146,4 +173,4 @@ function fragment(source,{svg=false,section=false,allowExternal=false}={}) {
   }
   if(stack.length||roots!==1||svg&&rootTag!=='svg'||section&&rootTag!=='section') throw Error('invalid fragment root'); return result;
 }
-module.exports={HTML,SVG,VOID,RAW,escapeText,escapeAttr,decode,safeUrl,css,attribute,tokenize,parseAttrs,fragment};
+module.exports={HTML,SVG,VOID,RAW,escapeText,escapeAttr,decode,decodeAttribute,safeUrl,css,attribute,tokenize,parseAttrs,fragment};

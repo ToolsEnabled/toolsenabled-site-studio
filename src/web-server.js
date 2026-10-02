@@ -22,12 +22,10 @@ function createCoordinator(options = {}, preparedStore) {
   const port = options.port ?? 0;
   if (!Number.isInteger(port) || port < 0 || port > 65535) throw Error('invalid port');
   const store = preparedStore || createStore(options);
-  const token = crypto.randomBytes(32).toString('hex');
-  const readCapability = crypto.randomBytes(32).toString('hex');
-  const previewId=crypto.randomBytes(12).toString('hex');
-  const previewPrefix='/preview/'+previewId;
-  const previewCookie='site_studio_preview_'+previewId;
-  const launchCapability = crypto.randomBytes(32).toString('hex');
+  let token = crypto.randomBytes(32).toString('hex');
+  let readCapability=crypto.randomBytes(32).toString('hex'),previewId=crypto.randomBytes(12).toString('hex');
+  let previewPrefix='/preview/'+previewId,previewCookie='site_studio_preview_'+previewId,previewAuthNotified=false;
+  let launchCapability = crypto.randomBytes(32).toString('hex');
   let launchConsumed = false;
   const equal = (a,b) => typeof a === 'string' && Buffer.byteLength(a) === Buffer.byteLength(b) && crypto.timingSafeEqual(Buffer.from(a),Buffer.from(b));
   const hasPreview = req => {
@@ -40,9 +38,9 @@ function createCoordinator(options = {}, preparedStore) {
   let address, siteAddress, closing = false, closePromise;
   const origin = () => address ? 'http://127.0.0.1:' + address.port : null;
   const siteOrigin = () => siteAddress ? 'http://127.0.0.1:' + siteAddress.port : null;
-  const status = () => ({...store.status, previewUrl:siteOrigin()+previewPrefix, files:store.snapshot.files.map(({id,path,kind}) => ({id,path,kind}))});
-  const notify = () => {
-    for (const client of clients) client.write('data: ' + JSON.stringify({rev:store.snapshot.rev}) + '\n\n');
+  const status = () => ({...store.status, previewIssues:previewSnapshot===store.snapshot?[...previewIssues.values()]:[], previewUrl:siteOrigin()+previewPrefix, files:store.snapshot.files.map(({id,path,kind}) => ({id,path,kind}))});
+  const notify = (extra={}) => {
+    for (const client of clients) client.write('data: ' + JSON.stringify({rev:store.snapshot.rev,...extra}) + '\n\n');
   };
   const json = (res,code,value) => {
     if(code>=400)res.setHeader('Connection','close');
@@ -54,16 +52,22 @@ function createCoordinator(options = {}, preparedStore) {
     return "sandbox allow-same-origin; default-src 'none'; script-src 'none'; style-src 'self' 'unsafe-inline'" + remote +
       "; img-src 'self'" + remote + "; font-src 'self'" + remote + "; connect-src 'none'; form-action 'none'; base-uri 'none'; frame-ancestors " + origin();
   }
-  let previewSnapshot,previewCache=new Map(),previewCacheBytes=0;
+  let previewSnapshot,previewCachePrefix,previewCache=new Map(),previewFailures=new Map(),previewIssues=new Map(),previewCacheBytes=0;
   function previewBody(file){
-    if(previewSnapshot!==store.snapshot){previewSnapshot=store.snapshot;previewCache.clear();previewCacheBytes=0;}
+    if(previewSnapshot!==store.snapshot||previewCachePrefix!==previewPrefix){if(previewSnapshot!==store.snapshot){previewFailures.clear();previewIssues.clear();}previewSnapshot=store.snapshot;previewCachePrefix=previewPrefix;previewCache.clear();previewCacheBytes=0;}
+    if(previewFailures.has(file))throw previewFailures.get(file);
     if(previewCache.has(file)){const body=previewCache.get(file);previewCache.delete(file);previewCache.set(file,body);return body;}
-    const body=previewBytes(file,previewPrefix),budget=64*1024*1024;
+    let body;try{body=previewBytes(file,previewPrefix,{onNotice:message=>previewNotice(file,message)});}catch(e){previewFailures.set(file,e);throw e;}
+    const budget=64*1024*1024;
     if(body.length<=budget){
       while(previewCacheBytes+body.length>budget){const first=previewCache.keys().next().value;previewCacheBytes-=previewCache.get(first).length;previewCache.delete(first);}
       previewCache.set(file,body);previewCacheBytes+=body.length;
     }
     return body;
+  }
+  function previewNotice(file,message){
+    if(previewIssues.get(file)?.message===message)return;
+    previewIssues.set(file,{path:file.path,message});notify();
   }
   function serveSite(res,relative) {
     if (relative === '' || relative.endsWith('/')) relative += 'index.html';
@@ -72,7 +76,7 @@ function createCoordinator(options = {}, preparedStore) {
     if (!file) return json(res,404,{error:'file not found'});
     const mime = MIME[path.extname(relative).toLowerCase()];
     if (!mime) return json(res,403,{error:'opaque asset is export-only'});
-    const body=previewBody(file);
+    let body;try{body=previewBody(file);}catch(e){previewNotice(file,'Preview unavailable: '+e.message+'. Original files are unchanged.');throw e;}
     res.writeHead(200, {'Content-Type':mime,'Content-Security-Policy':previewCsp()});
     res.end(body);
   }
@@ -92,7 +96,11 @@ function createCoordinator(options = {}, preparedStore) {
       const pathname = decodeURIComponent(raw);
       if (isPreview) {
         if (req.method !== 'GET') return json(res,405,{error:'preview is read-only'});
-        if(!pathname.startsWith(previewPrefix+'/')||!hasPreview(req))return json(res,403,{error:'preview capability required'});
+        if(!pathname.startsWith(previewPrefix+'/'))return json(res,403,{error:'preview capability required'});
+        if(!hasPreview(req)){
+          if(!previewAuthNotified){previewAuthNotified=true;notify({previewUnauthorized:previewId});}
+          return json(res,403,{error:'preview capability required'});
+        }
         return serveSite(res,pathname.slice(previewPrefix.length+1));
       }
       if (pathname === '/open' && new URL(req.url,origin()).search) return json(res,403,{error:'Launch secrets belong in the URL fragment.'});
@@ -113,22 +121,40 @@ function createCoordinator(options = {}, preparedStore) {
         if (clients.size >= 8) return json(res,429,{error:'preview client limit'});
         req.setTimeout(0);
         res.writeHead(200,{'Content-Type':'text/event-stream'});
-        res.write('data: {}\n\n');
+        res.write('data: '+JSON.stringify({rev:store.snapshot.rev,...(previewAuthNotified?{previewUnauthorized:previewId}:{})})+'\n\n');
         clients.add(res);
         req.on('close',() => clients.delete(res));
         return;
       }
       if (req.method === 'POST') {
         if (req.headers['content-type'] !== 'application/json') return json(res,415,{error:'application/json required'});
-        if (!['/api/control','/api/preview-session'].includes(pathname)) return json(res,404,{error:'not found'});
+        if (!['/api/control','/api/preview-session','/api/session/reissue'].includes(pathname)) return json(res,404,{error:'not found'});
         if (!hasSession(req)) return json(res,403,{error:'dashboard session required'});
         if (req.headers.origin !== origin()) return json(res,403,{error:'human same-origin action required'});
         const body = await readJson(req);
         if (closing) return json(res,503,{error:'closing'});
+        if(!hasSession(req))return json(res,403,{error:'dashboard session required'});
+        if(pathname==='/api/session/reissue'){
+          if(Object.keys(body).length!==1||!Number.isInteger(body.expectedRev))return json(res,400,{error:'expectedRev required'});
+          if(body.expectedRev!==store.snapshot.rev)return json(res,409,{error:'stale revision'});
+          token=crypto.randomBytes(32).toString('hex');launchCapability=crypto.randomBytes(32).toString('hex');launchConsumed=false;
+          readCapability=crypto.randomBytes(32).toString('hex');previewId=crypto.randomBytes(12).toString('hex');
+          previewPrefix='/preview/'+previewId;previewCookie='site_studio_preview_'+previewId;previewAuthNotified=false;
+          for(const client of clients)client.end();clients.clear();
+          return json(res,200,{launchUrl:origin()+'/open#cap='+launchCapability});
+        }
         if(pathname==='/api/preview-session'){
-          if(Object.keys(body).length)return json(res,400,{error:'empty JSON object required'});
-          res.setHeader('Set-Cookie',previewCookie+'='+readCapability+'; Path='+previewPrefix+'/; HttpOnly; SameSite=Strict');
-          return json(res,200,{previewUrl:siteOrigin()+previewPrefix});
+          const keys=Object.keys(body);
+          if(keys.length&&!(keys.length===1&&keys[0]==='previewId'&&typeof body.previewId==='string'&&RX.previewId.test(body.previewId)))return json(res,400,{error:'empty object or previewId required'});
+          let expired;
+          if(!keys.length||body.previewId===previewId){
+            expired=previewCookie+'=; Path='+previewPrefix+'/; Max-Age=0; HttpOnly; SameSite=Strict';
+            readCapability=crypto.randomBytes(32).toString('hex');previewId=crypto.randomBytes(12).toString('hex');
+            previewPrefix='/preview/'+previewId;previewCookie='site_studio_preview_'+previewId;previewAuthNotified=false;
+          }
+          const cookie=previewCookie+'='+readCapability+'; Path='+previewPrefix+'/; HttpOnly; SameSite=Strict';
+          res.setHeader('Set-Cookie',expired?[cookie,expired]:cookie);
+          json(res,200,{previewUrl:siteOrigin()+previewPrefix});notify();return;
         }
         const {action,...args} = body;
         const result = store.human(action,args);

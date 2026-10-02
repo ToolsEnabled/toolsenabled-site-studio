@@ -1,4 +1,5 @@
 'use strict';
+const {absolutePath}=require('./options');
 const RX=require('./patterns');
 const fs=require('node:fs');const path=require('node:path');const crypto=require('node:crypto');const os=require('node:os');
 const {applyOp,validateModel,hash}=require('./web-model');
@@ -26,23 +27,24 @@ function atomicJson(file,value) {
 function freeze(value){if(value&&typeof value==='object'){for(const item of Object.values(value))freeze(item);Object.freeze(value);}return value;}
 function* storeSteps(options={}) {
   const allowed=new Set(['sourceRoot','dataRoot','exportRoot','port','host','allowExternal']);for(const key of Object.keys(options))if(!allowed.has(key))throw Error('unknown option: '+key);
-  const sourceRoot=checkedPath(options.sourceRoot||process.env.SITE_STUDIO_ROOT||path.join(__dirname,'../site'));
-  const dataRoot=checkedPath(options.dataRoot||process.env.SITE_STUDIO_DATA||path.join(os.homedir(),'.site-studio',hash(sourceRoot).slice(7,23)),{missing:true});
-  const exportRoot=options.exportRoot?checkedPath(options.exportRoot,{missing:true}):null;
+  const sourceRoot=checkedPath(absolutePath(options.sourceRoot??process.env.SITE_STUDIO_ROOT??path.join(__dirname,'../site'),'site directory'));
+  const dataRoot=checkedPath(absolutePath(options.dataRoot??process.env.SITE_STUDIO_DATA??path.join(os.homedir(),'.site-studio',hash(sourceRoot).slice(7,23)),'state directory'),{missing:true});
+  const exportRoot=options.exportRoot===undefined?null:checkedPath(absolutePath(options.exportRoot,'export directory'),{missing:true});
+  const installRoot=fs.realpathSync(path.join(__dirname,'..'));
+  if(within(dataRoot,installRoot)||exportRoot&&within(exportRoot,installRoot))throw Error('state and export folders must be outside the plugin installation');
   if(within(sourceRoot,dataRoot)||within(dataRoot,sourceRoot))throw Error('source and state roots must not overlap');
   if(exportRoot&&(within(exportRoot,dataRoot)||within(dataRoot,exportRoot)||exportRoot!==sourceRoot&&(within(exportRoot,sourceRoot)||within(sourceRoot,exportRoot))))throw Error('overlapping export root refused');
   fs.mkdirSync(dataRoot,{recursive:true,mode:0o700});checkedPath(dataRoot);const st=fs.statSync(dataRoot);if(process.platform!=='win32'&&(st.mode&0o077))throw Error('state root must have private permissions (chmod 700)');
-  const lease=path.join(dataRoot,'lease.json');let leaseStat;
-  try{const fd=fs.openSync(lease,'wx',0o600);try{fs.writeFileSync(fd,JSON.stringify({pid:process.pid,entry:'site-studio',nonce:crypto.randomBytes(16).toString('hex')}));fs.fsyncSync(fd);leaseStat=fs.fstatSync(fd);}finally{fs.closeSync(fd);}}catch(e){if(e.code==='EEXIST')throw Error('State lease already exists. Stop the other Site Studio process or choose another --data-dir. After a crash, verify its PID is gone before removing lease.json.');throw e;}
+  const releaseLease=require('./state-lease').acquireLease(dataRoot);
   let closed=false,handedOff=false,durabilityWarning=null;
-  function release(){if(closed)return;closed=true;let current;try{current=fs.lstatSync(lease);}catch(e){if(e.code==='ENOENT')return;throw e;}if(current.ino===leaseStat.ino&&current.dev===leaseStat.dev&&!current.isSymbolicLink())fs.unlinkSync(lease);}
+  function release(){if(closed)return;closed=true;releaseLease();}
   try {
     const statePath=path.join(dataRoot,'state.json');let state,snapshot;
     const policy={allowExternal:options.allowExternal===true};
     // Validate the original on every start, even when resuming a persisted copy.
     const imported=yield* importSiteSteps(sourceRoot);
     if(fs.existsSync(statePath)){checkedPath(statePath);const s=fs.lstatSync(statePath);if(!s.isFile()||s.nlink!==1||s.size>128*1024*1024)throw Error('invalid state file');state=JSON.parse(fs.readFileSync(statePath,'utf8'));if(state.version!==1||state.sourceRoot!==sourceRoot||state.allowExternal!==policy.allowExternal)throw Error('state belongs to another site or external-reference policy'); validateModel(state.model);}
-    else {if(fs.readdirSync(dataRoot).some(n=>n!=='lease.json'))throw Error('state root must be an empty dedicated directory');state={version:1,fingerprintVersion:2,sourceRoot,allowExternal:policy.allowExternal,originalFingerprint:fingerprint(imported),model:imported,openedModel:imported,paused:false,undo:[],redo:[],checkpoints:[],history:[{rev:0,actor:'system',type:'open',summary:'Opened working copy'}],generation:null};}
+    else {if(fs.readdirSync(dataRoot).some(n=>n!=='lease.json'&&!RX.leaseMetadata.test(n)))throw Error('state root must be an empty dedicated directory');state={version:1,fingerprintVersion:2,sourceRoot,allowExternal:policy.allowExternal,originalFingerprint:fingerprint(imported),model:imported,openedModel:imported,paused:false,undo:[],redo:[],checkpoints:[],history:[{rev:0,actor:'system',type:'open',summary:'Opened working copy'}],generation:null};}
     if(state.fingerprintVersion!==2){state.originalFingerprint=require('./fingerprint-migration').migrateFingerprint(state,imported);state.fingerprintVersion=2;}
     if(!state.openedModel){
       state.openedModel=[state.model,...state.undo,...state.redo,...state.checkpoints.map(c=>c.model)].find(m=>m.rev===0);

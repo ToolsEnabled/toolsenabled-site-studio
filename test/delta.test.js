@@ -20,7 +20,7 @@ module.exports={bounded};
 test('held unauthenticated sockets do not exclude new human requests',async t=>{
  const net=require('node:net'),http=require('node:http');const {fixture}=require('./helpers');const {createCoordinator}=require('../src/web-server');const {openSession,issuePreview}=require('./session-helper');
  const app=createCoordinator(fixture(t));t.after(()=>app.close());await app.listen();const {headers}=await openSession(app.launchUrl);const status=await (await fetch(app.previewUrl+'/api/status',{headers})).json();const preview=await issuePreview(app.previewUrl,headers);
- for(const [base,route,auth] of [[app.previewUrl,'/api/status',headers],[app.siteUrl,new URL(status.previewUrl).pathname+'/index.html',preview.headers]]){
+ for(const [base,route,auth] of [[app.previewUrl,'/api/status',headers],[app.siteUrl,new URL(preview.url).pathname+'/index.html',preview.headers]]){
   const sockets=[];t.after(()=>sockets.forEach(s=>s.destroy()));
   await Promise.all(Array.from({length:48},()=>new Promise(resolve=>{const s=net.createConnection(new URL(base).port,'127.0.0.1');sockets.push(s);s.on('error',resolve);s.resume();s.once('connect',()=>{s.write('GET / HTTP/1.1\r\nHost:');resolve();});})));
   const code=await new Promise((resolve,reject)=>{const r=http.get(base+route,{agent:false,headers:auth},res=>{res.resume();res.on('end',()=>resolve(res.statusCode));});r.on('error',reject);r.setTimeout(1500,()=>r.destroy(Error('human request timed out')));});assert.equal(code,200);sockets.forEach(s=>s.destroy());
@@ -182,10 +182,78 @@ test('SVG preview handles CDATA, internal namespace entities and XML RAW names',
  for(const root of ['html xmlns="http://www.w3.org/1999/xhtml"','s:svg xmlns:s="http://www.w3.org/2000/svg"']){
   const result=render('<'+root+'><title><meta xmlns="http://www.w3.org/1999/xhtml" name="referrer" content="unsafe-url"/></title></'+root.split(' ')[0]+'>');assert(!result.includes('<meta'));
  }
- assert.throws(()=>render('<!DOCTYPE svg [<!ENTITY e "'+'x'.repeat(4096)+'">]><svg><text>'+'&e;'.repeat(3000)+'</text></svg>'),/expansion limit/);
+ assert.throws(()=>render('<!DOCTYPE svg [<!ENTITY e "'+'x'.repeat(4096)+'">]><svg><text>'+'&e;'.repeat(3000)+'</text></svg>'),/preview.*limit/i);
  assert(render('<svg xmlns="http://www.w3.org/2000/svg"><text><![CDATA[url(/literal)]]></text></svg>').includes('<![CDATA[url(/literal)]]>'));
  // Unsupported entity expansion is never handed to the browser's XML parser.
  for(const declaration of ['<!ENTITY x SYSTEM "file:///etc/passwd">','<!ENTITY x "&x;&x;">','<!ENTITY % x "boom">']){
   const out=render('<!DOCTYPE svg ['+declaration+']><svg xmlns="http://www.w3.org/2000/svg"><text>&x;</text></svg>');assert(!out.includes('<!ENTITY'));assert(out.includes('&amp;x;'));
  }
+});
+
+test('maximum rejected caseless queries complete in linear time',()=>{
+ bounded(`const {call}=require('./mcp-web');const assert=require('node:assert/strict');
+ const source='ß'.repeat(1024*1024);const app={model:{rev:0,files:[{id:'dense',path:'dense.txt',kind:'text',source}]}};
+ assert.deepEqual(JSON.parse(call(app,'web_find',{query:'S'.repeat(8191),limit:100}).content[0].text).hits,[]);
+ app.model.files[0].source='ﬃ'.repeat(600000);assert.deepEqual(JSON.parse(call(app,'web_find',{query:'FFI'.repeat(2730)+'F',limit:100}).content[0].text).hits,[]);
+ `,3000);
+});
+
+test('caseless matcher agrees with whole-character reference over overlapping cases',()=>{
+ const {fold,search}=require('../src/caseless-search');
+ const alphabet=['S','ß','İ','ﬃ','😀','\ud83d','\ude00','Σ','A'];let seed=31;
+ const next=n=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed%n;};
+ function reference(source,query){const chunks=Array.from(source,c=>({c,folded:fold(c)}));let text='',offset=0;const boundaries=new Map([[0,0]]);for(const part of chunks){text+=part.folded;offset+=part.c.length;boundaries.set(text.length,offset);}const out=[];for(let at=0;at<=text.length-query.length;at++){if(text.startsWith(query,at)&&boundaries.has(at)&&boundaries.has(at+query.length)){out.push(boundaries.get(at));at+=query.length-1;}}return out;}
+ for(let i=0;i<12000;i++){const source=Array.from({length:next(18)+1},()=>alphabet[next(alphabet.length)]).join('');const query=fold(Array.from({length:next(5)+1},()=>alphabet[next(alphabet.length)]).join(''));assert.deepEqual(search(source,query,100).map(h=>h.offset),reference(source,query),JSON.stringify({source,query}));}
+});
+
+test('newer Unicode characters do not disable bulk folding of surrounding text',()=>{
+ bounded(`const {call}=require('./mcp-web'),{fold}=require('./src/caseless-search');const assert=require('node:assert/strict');
+ for(const newer of ['\\u1c89','\\ua7cb','\\u{10d50}']){
+  const source='ß'.repeat(512000)+newer+'Σ'.repeat(510000);
+  const app={model:{rev:0,files:Array.from({length:5},(_,i)=>({id:'f'+i,path:i+'.txt',kind:'text',source}))}};
+  assert.deepEqual(JSON.parse(call(app,'web_find',{query:'NO-HIT',limit:100}).content[0].text).hits,[]);
+  assert.equal(fold('Σ'+newer+'ß'),'σ'+newer+'ss');
+ }`,4000);
+});
+
+test('XML custom entities are not expanded in URL-bearing attributes or CSS',()=>{
+ const {previewBytes}=require('../src/preview-content');
+ const render=source=>previewBytes({kind:'asset',path:'art.svg',encoding:'base64',source:Buffer.from(source).toString('base64')},'/preview/'+'a'.repeat(24)).toString();
+ const source='<!DOCTYPE svg [<!ENTITY items "'+('x,'.repeat(2000))+'"><!ENTITY color "red">]><svg xmlns="http://www.w3.org/2000/svg"><image srcset="'+('&items;'.repeat(100))+'"/><style>a { fill: &color; }</style><text>&color;</text></svg>';
+ const result=render(source);assert(result.length<16384,'URL expansion inflated the output');assert(result.includes('&amp;items;'));assert(result.includes('fill: &amp;color;'));assert(result.includes('<text>red</text>'));
+ for(const attr of ['href','xlink:href','src','srcset','style','fill','filter','mask','cursor','marker-start'])assert(render('<!DOCTYPE svg [<!ENTITY x "logo.svg">]><svg '+attr+'="&x;"/>').includes('&amp;x;'),attr);
+});
+
+test('preview limits count UTF-8 bytes and reject rewritten output before large allocation',()=>{
+ const script=`const assert=require('node:assert/strict'),{previewBytes}=require('./src/preview-content'),{xmlDecoder}=require('./src/xml-preview');
+ const decode=xmlDecoder([{declaration:'<!DOCTYPE svg [<!ENTITY x "'+('界'.repeat(1000))+'">]>'}]);
+ assert.throws(()=>decode('&x;'.repeat(750)),/preview.*limit/i);
+ const svg='<!DOCTYPE svg [<!ENTITY x \"'+('a,'.repeat(2048))+'\">]><svg srcset=\"'+('&x;'.repeat(1000))+'\"/>';
+ const before=process.memoryUsage().rss;assert(previewBytes({kind:'asset',path:'art.svg',encoding:'base64',source:Buffer.from(svg).toString('base64')},'/preview/'+'a'.repeat(24)).length<16384);
+ assert.equal(previewBytes({kind:'html',path:'index.html',source:'<b></b>'.repeat(20000)},'/preview/id').length,140000);
+ const source='b:url(x);'.repeat(220000);
+ assert.throws(()=>previewBytes({kind:'css',path:'a.css',source},'/preview/'+'a'.repeat(24)),/preview.*limit/i);
+ assert(process.resourceUsage().maxRSS*1024-before<128*1024*1024,'preview memory growth exceeds 128 MiB');`;
+ const result=spawnSync(process.execPath,['--max-old-space-size=128','-e',script],{cwd:root,timeout:3000,encoding:'utf8',maxBuffer:65536});assert.equal(result.error,undefined,result.error?.message);assert.equal(result.status,0,result.stderr);
+});
+
+test('preview failures are cached per snapshot across query variants',()=>{
+ bounded(`(async()=>{const assert=require('node:assert/strict'),cleanup=[];const o=require('./test/helpers').fixture({after:fn=>cleanup.push(fn)});const preview=require('./src/preview-content');let calls=0;preview.previewBytes=()=>{calls++;throw Error('preview output limit');};const app=require('./src/web-server').createCoordinator(o);try{await app.listen();const session=await require('./test/session-helper').previewSession(app);for(let i=0;i<10;i++)assert.equal((await fetch(session.url+'/index.html?'+i,{headers:session.headers})).status,400);assert.equal(calls,1);app.edit(require('./test/helpers').textOp(app.model,'Changed'));assert.equal((await fetch(session.url+'/index.html',{headers:session.headers})).status,400);assert.equal(calls,2);}finally{await app.close();for(const fn of cleanup.reverse())await fn();}})().catch(e=>{console.error(e);process.exitCode=1;});`);
+});
+
+test('HTML attributes decode legacy and numeric references without semicolons',()=>{
+ const {parseAttrs}=require('../src/sanitize'),{previewBytes}=require('../src/preview-content');
+ for(const [source,expected] of [['&copy 2024','© 2024'],['&#169','©'],['&#xA9','©'],['&#169x','©x'],['&copyé','©é'],['&copycat','&copycat'],['&copy=1','&copy=1'],['&notin','&notin'],['&notin;','∉'],['&hellip','&hellip'],['&amp;copy','&copy']]){
+  assert.equal(parseAttrs(' title="'+source+'"')[0][1],expected,source);
+  const body=previewBytes({kind:'html',path:'index.html',source:'<p title="'+source+'">Text</p>'},'/preview/id').toString();assert.equal(parseAttrs(body.slice(2,body.indexOf('>')))[0][1],expected,source);
+ }
+});
+
+test('preview keeps dense legitimate pages and drops only oversize attributes with a notice',()=>{
+ const {previewBytes}=require('../src/preview-content'),{MAX_FILE}=require('../src/web-import');const notices=[];
+ const render=source=>previewBytes({kind:'html',path:'index.html',source},'/preview/id',{onNotice:message=>notices.push(message)}).toString();
+ const list='<ul>'+'<li>x</li>'.repeat(11000)+'</ul>';assert(Buffer.byteLength(list)<MAX_FILE);assert.equal(render(list),list);
+ const page='<h1>Kept</h1><img src="data:image/png;base64,'+'a'.repeat(70000)+'" alt="Kept image description"><p>After</p>';
+ const body=render(page);assert(body.includes('<h1>Kept</h1>'));assert(body.includes('<img alt="Kept image description">'));assert(body.includes('<p>After</p>'));assert(notices.some(s=>s.includes('attribute')));
+ const css=render('<p style="background:'+'url(x) '.repeat(8000)+'" title="kept">Text</p>');assert.equal(css,'<p title="kept">Text</p>');
 });

@@ -56,6 +56,7 @@ test('five registration helpers handle spaces and shell metacharacters without w
     else assert.match(output,/'\/tmp\/example site\/\$\(no-command\)'/);
   }
   assert.throws(()=>clientConfig('invalid'),/Usage/);
+  for (const key of ['site','dataDir','exportDir','appRoot']) for (const value of ['~','~/x','relative','']) assert.throws(()=>clientConfig('codex',{[key]:value}),/absolute path/);
   const bad = spawnSync(process.execPath,[path.join(__dirname,'../tools/mcp-config.mjs'),'--client','bad'],{encoding:'utf8'});
   assert.equal(bad.status,1); assert.equal(bad.stdout,'');
 });

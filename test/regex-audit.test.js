@@ -10,7 +10,7 @@ function checkSource(source,file){
  if(source.startsWith('#!'))i=source.indexOf('\n')+1;code();
 }
 test('all runtime regexes belong to the timed inventory',()=>{
- const files=['mcp-web.js','web-server.js','web-guard.js',...['src','public','tools'].flatMap(dir=>fs.readdirSync(path.join(root,dir)).filter(n=>n.endsWith('.js')||n.endsWith('.mjs')).map(n=>dir+'/'+n))].filter(n=>n!=='src/patterns.js');
+ const files=['mcp-web.js','web-server.js','web-guard.js',...['src','public','tools'].flatMap(dir=>fs.readdirSync(path.join(root,dir)).filter(n=>n.endsWith('.js')||n.endsWith('.mjs')||n.endsWith('.cjs')).map(n=>dir+'/'+n))].filter(n=>n!=='src/patterns.js');
  for(const file of files)checkSource(fs.readFileSync(path.join(root,file),'utf8'),file);
  assert.throws(()=>checkSource('const x=`${ /bad/.test(input) }`;','fixture'));
 });

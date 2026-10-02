@@ -1,7 +1,8 @@
 'use strict';
 // Keep runtime patterns in this audited inventory. Scanners handle structural parsing.
 module.exports=Object.freeze({
-  newerCase: /[\u1c89\ua7cb-\ua7cc\ua7da\ua7dc\u{10d50}-\u{10d65}]/u,
+  previewId: /^[a-f0-9]{24}$/,
+  newerCase: /[\u1c89\ua7cb-\ua7cc\ua7da\ua7dc\u{10d50}-\u{10d65}]+/gu,
   foldSpecial: /[\u00b5\u00df\u0130\u0149\u017f\u01f0\u0345\u0390\u03a3\u03b0\u03c2\u03d0-\u03d1\u03d5-\u03d6\u03f0-\u03f1\u03f5\u0587\u13a0-\u13f5\u13f8-\u13fd\u1c80-\u1c89\u1e96-\u1e9b\u1e9e\u1f50\u1f52\u1f54\u1f56\u1f80-\u1faf\u1fb2-\u1fb4\u1fb6-\u1fb7\u1fbc\u1fbe\u1fc2-\u1fc4\u1fc6-\u1fc7\u1fcc\u1fd2-\u1fd3\u1fd6-\u1fd7\u1fe2-\u1fe4\u1fe6-\u1fe7\u1ff2-\u1ff4\u1ff6-\u1ff7\u1ffc\ua7cb-\ua7cc\ua7da\ua7dc\uab70-\uabbf\ufb00-\ufb06\ufb13-\ufb17]|\ud803[\udd50-\udd65]/g,
   space: /\s/,
   spaces: /\s+/,
@@ -23,10 +24,10 @@ module.exports=Object.freeze({
   labelControls: /[\p{Cc}\p{Cf}\p{Default_Ignorable_Code_Point}]/u,
   systemLabel: /^(?:opened working copy|original site|undid last edit|redid last edit|paused editing|resumed editing|restored checkpoint|deleted checkpoint|saved checkpoint|exported)(?:$|[ (·])/i,
   generation: /^working-[a-f0-9]{32}$/,
+  leaseMetadata: /^\.lease-(?:temp|recovery)-[0-9a-f]{32}$/,
   escapeText: /[&<>]/g,
   escapeQuote: /"/g,
   xmlEntity: /&(?:#x([0-9a-f]+)|#([0-9]+)|([a-z_:][a-z0-9_.:-]{0,127}));/gi,
-  entity: /&(?:#x([0-9a-f]+)|#([0-9]+)|([a-z][a-z0-9]{0,31}));/gi,
   unsafeReference: /[\s\\\x00-\x1f\x7f&<>"'`]/,
   fragmentReference: /^#[\w.-]+$/,
   httpsReference: /^https:\/\/[a-z0-9.-]+(?::443)?(?:[/?#]|$)/i,

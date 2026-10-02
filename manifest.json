@@ -1,0 +1,72 @@
+{
+  "manifest_version": "0.3",
+  "name": "toolsenabled-site-studio",
+  "display_name": "ToolsEnabled Site Studio",
+  "version": "0.1.2",
+  "description": "Local static website editing with a private working copy and human-controlled export.",
+  "author": {
+    "name": "ToolsEnabled, Inc.",
+    "email": "support@toolsenabled.ai",
+    "url": "https://toolsenabled.ai"
+  },
+  "homepage": "https://toolsenabled.ai",
+  "documentation": "https://github.com/ToolsEnabled/toolsenabled-site-studio#readme",
+  "support": "mailto:support@toolsenabled.ai",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ToolsEnabled/toolsenabled-site-studio"
+  },
+  "license": "MIT",
+  "privacy_policies": [
+    "https://toolsenabled.ai/legal/privacy/"
+  ],
+  "server": {
+    "type": "node",
+    "entry_point": "mcp-web.js",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/mcp-web.js",
+        "--site",
+        "${user_config.site_directory}",
+        "--data-dir",
+        "${user_config.data_directory}",
+        "--export-dir",
+        "${user_config.export_directory}"
+      ],
+      "env": {
+        "SITE_STUDIO_ROOT": "${user_config.site_directory}",
+        "SITE_STUDIO_DATA": "${user_config.data_directory}"
+      }
+    }
+  },
+  "user_config": {
+    "site_directory": {
+      "type": "directory",
+      "title": "Static site folder",
+      "description": "Absolute path to built static website files. Site Studio edits a private copy.",
+      "required": true
+    },
+    "data_directory": {
+      "type": "directory",
+      "title": "Private working state folder",
+      "description": "Absolute path to a new or empty private folder outside the site and export folders. Use one folder per site and client. Keep it outside the plugin installation.",
+      "required": true
+    },
+    "export_directory": {
+      "type": "directory",
+      "title": "Human export destination",
+      "description": "Absolute path to a new destination folder whose parent exists, outside the site and state folders. Only the human dashboard can confirm export. Keep it outside the plugin installation.",
+      "required": true
+    }
+  },
+  "compatibility": {
+    "platforms": [
+      "darwin",
+      "win32"
+    ],
+    "runtimes": {
+      "node": ">=22"
+    }
+  }
+}

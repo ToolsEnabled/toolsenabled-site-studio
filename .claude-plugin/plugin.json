@@ -1,0 +1,40 @@
+{
+  "name": "toolsenabled-site-studio",
+  "version": "0.1.2",
+  "displayName": "ToolsEnabled Site Studio",
+  "description": "Edit static sites in a private working copy, with checkpoints, local preview and human-controlled export.",
+  "author": {
+    "name": "ToolsEnabled, Inc.",
+    "email": "support@toolsenabled.ai",
+    "url": "https://toolsenabled.ai"
+  },
+  "homepage": "https://toolsenabled.ai",
+  "repository": "https://github.com/ToolsEnabled/toolsenabled-site-studio",
+  "license": "MIT",
+  "keywords": [
+    "static-sites",
+    "editing",
+    "local",
+    "checkpoints"
+  ],
+  "userConfig": {
+    "site_directory": {
+      "type": "directory",
+      "title": "Static site folder",
+      "description": "Absolute path to built static website files. Site Studio edits a private copy.",
+      "required": true
+    },
+    "data_directory": {
+      "type": "directory",
+      "title": "Private working state folder",
+      "description": "Absolute path to a new or empty private folder outside the site and export folders. Use one folder per site and client. Keep it outside the plugin installation.",
+      "required": true
+    },
+    "export_directory": {
+      "type": "directory",
+      "title": "Human export destination",
+      "description": "Absolute path to a new destination folder whose parent exists, outside the site and state folders. Only the human dashboard can confirm export. Keep it outside the plugin installation.",
+      "required": true
+    }
+  }
+}

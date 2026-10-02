@@ -38,3 +38,11 @@ test('special source file rejects before opening it',async t=>{if(process.platfo
 test('UTF-8 BOM and public well-known files round-trip exactly',async t=>{const o=fixture(t);const html=Buffer.concat([Buffer.from([239,187,191]),fs.readFileSync(path.join(o.sourceRoot,'index.html'))]);fs.writeFileSync(path.join(o.sourceRoot,'index.html'),html);fs.mkdirSync(path.join(o.sourceRoot,'.well-known'));fs.writeFileSync(path.join(o.sourceRoot,'.well-known/security.txt'),'Contact: example');const app=createCoordinator(o);t.after(()=>app.close());app.human('export',{expectedRev:0,confirmed:true});assert.deepEqual(fs.readFileSync(path.join(o.exportRoot,'index.html')),html);assert.equal(fs.readFileSync(path.join(o.exportRoot,'.well-known/security.txt'),'utf8'),'Contact: example');});
 test('failed persistence after export promotion rolls the export back',async t=>{const o=fixture(t);o.exportRoot=o.sourceRoot;const app=createCoordinator(o);t.after(()=>app.close());app.edit(textOp(app.model));const before=fs.readFileSync(path.join(o.sourceRoot,'index.html'));const rename=fs.renameSync;try{fs.renameSync=(a,b)=>{if(b===path.join(o.dataRoot,'state.json'))throw Error('synthetic persistence failure');return rename(a,b);};assert.throws(()=>app.human('export',{expectedRev:1,confirmed:true}),/persistence failure/);}finally{fs.renameSync=rename;}assert.deepEqual(fs.readFileSync(path.join(o.sourceRoot,'index.html')),before);});
 test('cross-platform aliases and illegal filename characters refuse',()=>{for(const p of ['a?b.html','a*b.html','a<b.html','a|b.html','a"b.html'])assert.equal(safePath(p),false,p);const {validateModel}=require('../src/web-model');assert.throws(()=>validateModel({rev:0,root:'site',directories:['A','a'],files:[]}));});
+
+test('a special state lease refuses without blocking startup',t=>{
+ if(process.platform==='win32')return;
+ const o=fixture(t),{spawnSync}=require('node:child_process');fs.mkdirSync(o.dataRoot,{mode:0o700});
+ assert.equal(spawnSync('mkfifo',[path.join(o.dataRoot,'lease.json')]).status,0);
+ const child=spawnSync(process.execPath,['-e','require("./src/state-lease").acquireLease(process.argv[1])',o.dataRoot],{cwd:path.join(__dirname,'..'),encoding:'utf8',timeout:1000});
+ assert.equal(child.error,undefined);assert.equal(child.status,1);assert.match(child.stderr,/invalid state lease file/);
+});

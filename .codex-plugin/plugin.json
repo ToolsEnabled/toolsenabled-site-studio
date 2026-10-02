@@ -1,6 +1,6 @@
 {
   "name": "site-studio",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Build and edit static sites in an isolated working copy, with live preview and human-controlled export.",
   "author": {
     "name": "ToolsEnabled"
@@ -19,5 +19,17 @@
       "Improve the sample site and show me a preview."
     ]
   },
-  "mcpServers": "./.mcp.json"
+  "mcpServers": {
+    "site-studio": {
+      "command": "node",
+      "args": [
+        "./mcp-web.js"
+      ],
+      "cwd": "./",
+      "env_vars": [
+        "SITE_STUDIO_ROOT",
+        "SITE_STUDIO_DATA"
+      ]
+    }
+  }
 }

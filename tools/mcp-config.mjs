@@ -1,12 +1,13 @@
 import RX from '../src/patterns.js';
+import {absolutePath} from '../src/options.js';
 import {resolve,dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const usage='Usage: node tools/mcp-config.mjs --client claude|codex|cursor|claude-desktop|deepseek [--site FOLDER] [--data-dir FOLDER] [--export-dir FOLDER]';
 const quote=value=>process.platform==='win32'?"'"+value.replace(RX.powershellQuote,c=>c+c)+"'":"'"+value.replaceAll("'","'\\''")+"'";
 export function clientConfig(client,{site=resolve(root,'site'),dataDir,exportDir,node=process.execPath,appRoot=root}={}){
- const row={command:node,args:[resolve(appRoot,'mcp-web.js'),'--site',resolve(site)]};
- if(dataDir)row.args.push('--data-dir',resolve(dataDir));if(exportDir)row.args.push('--export-dir',resolve(exportDir));
+ const row={command:node,args:[resolve(absolutePath(appRoot,'plugin directory'),'mcp-web.js'),'--site',absolutePath(site,'site directory')]};
+ if(dataDir!==undefined)row.args.push('--data-dir',absolutePath(dataDir,'state directory'));if(exportDir!==undefined)row.args.push('--export-dir',absolutePath(exportDir,'export directory'));
  if(client==='claude')return 'claude mcp add --transport stdio site-studio -- '+[row.command,...row.args].map(quote).join(' ')+'\n';
  if(client==='codex')return 'codex mcp add site-studio -- '+[row.command,...row.args].map(quote).join(' ')+'\n';
  if(client==='cursor'||client==='claude-desktop')return JSON.stringify({mcpServers:{'site-studio':row}},null,2)+'\n';
