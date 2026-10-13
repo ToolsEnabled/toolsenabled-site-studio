@@ -60,6 +60,7 @@
   "test/browser-helper.js",
   "test/browser.test.js",
   "test/claude-package.test.js",
+  "test/codex-manifest.test.js",
   "test/commands.test.js",
   "test/dashboard-session.test.js",
   "test/delta.test.js",

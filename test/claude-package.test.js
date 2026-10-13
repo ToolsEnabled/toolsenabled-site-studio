@@ -14,10 +14,6 @@ test('Claude folder options launch literal paths and preserve Codex sample defau
   assert.equal(manifest.name, 'toolsenabled-site-studio');
   const codex = read('.codex-plugin/plugin.json');
   assert.deepEqual(codex.mcpServers, {'site-studio':{command:'node',args:['./mcp-web.js'],cwd:'./',env_vars:['SITE_STUDIO_ROOT','SITE_STUDIO_DATA','SystemRoot']}});
-  // Codex reads hooks/hooks.json (the Claude Code /site-studio mod) unless its manifest declares hooks; the empty object turns that off.
-  assert.deepEqual(codex.hooks, {});
-  assert.equal(codex.interface.developerName, 'ToolsEnabled, Inc.');
-  assert.deepEqual([codex.interface.websiteURL, codex.interface.supportURL, codex.interface.privacyPolicyURL, codex.interface.termsOfServiceURL], ['https://toolsenabled.ai/site-studio/', 'https://toolsenabled.ai/support/', 'https://toolsenabled.ai/privacy/', undefined]);
   assert.deepEqual(Object.keys(read('.mcp.json').mcpServers),Object.keys(codex.mcpServers));
   const o = fixture(t);
   const options = {site_directory: path.join(o.root, 'site space $(literal)'), data_directory: path.join(o.root, 'state space'), export_directory: path.join(o.root, 'export space')};
