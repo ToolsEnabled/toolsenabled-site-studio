@@ -1,4 +1,4 @@
-# ToolsEnabled Site Studio 0.1.5
+# ToolsEnabled Site Studio 0.1.6
 
 **Linux-only release.** Linux is tested; native Windows is not yet supported. Windows path isolation and private-directory permissions need fixes before use. macOS and native desktop-client installation remain unqualified.
 
@@ -8,11 +8,11 @@ Node.js **22 or newer** is required, together with the local filesystem and proc
 
 ## Start
 
-Download `toolsenabled-site-studio-0.1.5.zip` and `toolsenabled-site-studio-0.1.5.zip.sha256` from the [v0.1.5 release](https://github.com/ToolsEnabled/toolsenabled-site-studio/releases/tag/v0.1.5) into the same folder. Verify the archive against the `.sha256` file (the release notes print the same hash), extract it (it extracts to `site-studio/`), and start from that directory:
+Download `toolsenabled-site-studio-0.1.6.zip` and `toolsenabled-site-studio-0.1.6.zip.sha256` from the [v0.1.6 release](https://github.com/ToolsEnabled/toolsenabled-site-studio/releases/tag/v0.1.6) into the same folder. Verify the archive against the `.sha256` file (the release notes print the same hash), extract it (it extracts to `site-studio/`), and start from that directory:
 
 ```sh
-sha256sum -c toolsenabled-site-studio-0.1.5.zip.sha256
-unzip toolsenabled-site-studio-0.1.5.zip
+sha256sum -c toolsenabled-site-studio-0.1.6.zip.sha256
+unzip toolsenabled-site-studio-0.1.6.zip
 cd site-studio
 node mcp-web.js --site /absolute/path/to/static-site --data-dir /absolute/path/to/private-state --export-dir /absolute/path/to/finished-site
 ```
@@ -123,7 +123,7 @@ Find `Site Studio dashboard session:` in the host's stderr logs: Claude Code on 
 
 Open the one-time dashboard link from local startup diagnostics. Pause, resume, undo, redo, checkpoint restore/delete and export are **not available as MCP tools** and **require the dashboard session**. Select a page; the preview refreshes as edits land. Pause stops agent mutations. Undo, redo, and checkpoint restore always create a new revision. A paused human can still undo or restore. `web_checkpoint` saves an attributed agent checkpoint. The dashboard also has a human Save checkpoint button. The timeline identifies actor and action type. New events retain the local clock’s UTC timestamp; the history pane marks older or invalid timestamps as “Time not recorded” rather than inventing one. A permanent “Opened working copy (r0)” target remains available after older undo states are pruned. Checkpoint labels cannot use system summaries or invisible control characters.
 
-Choose **Export working copy**, inspect the destination/revision, then **Confirm export**. Configuring `--export-dir` selects a destination; it does not authorize an agent export. An agent bridge that reads the one-time dashboard secret from stderr or host logs and uses it to confirm exports is unsupported. An explicit human opt-in, audited agent-export path is a proposed design only, not implemented or supported in 0.1.5. See [export policy choices](docs/EXPORT-GATE.md). An edit arriving while confirmation is open makes that confirmation stale. Export never deploys anything. Export to a new destination leaves the source intact. Export to the original folder retains the previous folder beside it as `.site-studio-backup-<identifier>`. The receipt names the backup. Edits made outside Site Studio to the original cause a drift refusal; start a new state directory to import that new original, after saving any needed working-copy content.
+Choose **Export working copy**, inspect the destination/revision, then **Confirm export**. Configuring `--export-dir` selects a destination; it does not authorize an agent export. An agent bridge that reads the one-time dashboard secret from stderr or host logs and uses it to confirm exports is unsupported. An explicit human opt-in, audited agent-export path is a proposed design only, not implemented or supported in 0.1.6. See [export policy choices](docs/EXPORT-GATE.md). An edit arriving while confirmation is open makes that confirmation stale. Export never deploys anything. Export to a new destination leaves the source intact. Export to the original folder retains the previous folder beside it as `.site-studio-backup-<identifier>`. The receipt names the backup. Edits made outside Site Studio to the original cause a drift refusal; start a new state directory to import that new original, after saving any needed working-copy content.
 
 Checkpoints, pause state, undo/redo and the working copy survive restarts. An export also holds a destination lease in its parent directory; if an export process crashes, verify that its recorded PID is gone before removing that `.site-studio-export-*.lock` file. After an abnormal exit, startup recovers a stale `lease.json` automatically and prints a one-line notice. It first requires the same platform, hostname and Linux PID namespace, then compares the PID and operating-system process start identity (including the boot ID on Linux). A live owner still refuses a second writer. Immutable recovery claims coordinate contenders. Malformed leases, unavailable checks, scope mismatches and older leases without scope or creation identity refuse safely. For those cases, manually verify that all writers on the original host and namespace have stopped before removing the named lease; keep the working copy and checkpoints. Do not share state between hosts or namespaces. Do not edit `state.json` or working directories directly.
 

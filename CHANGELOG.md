@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.6 — 2026-10-13
+
+- The test runner (`node tools/run-tests.js`) checks `TMPDIR` before it starts any test and stops with a message that names the problem: `TMPDIR` must be the absolute real path of an existing folder, not one reached through a symbolic link, and at most 62 bytes long. Before, a longer `TMPDIR` made Chrome exit because its lock socket path did not fit the Unix limit, and the fifteen browser tests failed with a bare `read ECONNRESET`; a relative or linked `TMPDIR` made the working-copy store refuse its copy with `symbolic link refused` (a deliberate guard) in many tests. The browser helper repeats the length check when a browser test file is run on its own.
+- The README's development section and `docs/TESTING.md` say how to set `TMPDIR` for the tests and why. A new test checks that the runner stops on each kind of unusable `TMPDIR`.
+- The plugin itself (MCP server, tools, views, pane, export) is unchanged from 0.1.5.
+
 ## 0.1.5 — 2026-10-13
 
 - Declare MCP annotations on every tool: a short title, `readOnlyHint` and `destructiveHint`, `idempotentHint` for the nine tools that change the working copy or its checkpoints, and `openWorldHint` (false for every tool). Seven tools only read; the nine that change things are marked destructive. Tool names, inputs and behavior are unchanged, and a test pins every value.
