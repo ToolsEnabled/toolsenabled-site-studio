@@ -16,4 +16,16 @@ function textOp(model, text='Changed') {
   const {hash}=require('../src/web-model'); const f=model.files.find(f=>f.path==='index.html'); const n=f.nodes.find(n=>n.selectorHint==='h1');
   return {type:'set_text',expectedRev:model.rev,fileId:f.id,nodeId:n.id,baseHash:hash(f.source.slice(...n.range)),text};
 }
-module.exports={fixture,textOp};
+// A child process that a test starts gets only these variables: PATH to find programs, the
+// temporary-folder variables (TMPDIR; TEMP and TMP on Windows), on Windows SystemRoot, which the
+// server's process check needs, and any variable the caller names (the browser needs HOME).
+// Nothing else from the runner's environment.
+const CHILD_ENV = ['PATH', 'TMPDIR', 'TEMP', 'TMP', 'SystemRoot'];
+function childEnv(...more) {
+  const env = {};
+  for (const name of [...CHILD_ENV, ...more]) if (process.env[name] !== undefined) env[name] = process.env[name];
+  return env;
+}
+// Optional folder for evidence files such as screenshots (docs/TESTING.md); undefined when unset.
+function evidenceDir() { return process.env.SITE_STUDIO_EVIDENCE_DIR || undefined; }
+module.exports={fixture,textOp,childEnv,evidenceDir};

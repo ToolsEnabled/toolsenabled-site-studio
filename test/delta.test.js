@@ -1,7 +1,7 @@
 'use strict';
-const test=require('node:test');const assert=require('node:assert/strict');const {spawnSync}=require('node:child_process');const path=require('node:path');
+const test=require('node:test');const assert=require('node:assert/strict');const {spawnSync}=require('node:child_process');const path=require('node:path');const {childEnv}=require('./helpers');
 const root=path.join(__dirname,'..');
-function bounded(script,timeout=2500){const r=spawnSync(process.execPath,['-e',script],{cwd:root,timeout,encoding:'utf8'});assert.equal(r.error,undefined,r.error?.message);assert.equal(r.status,0,r.stderr);}
+function bounded(script,timeout=2500){const r=spawnSync(process.execPath,['-e',script],{cwd:root,timeout,encoding:'utf8',env:childEnv()});assert.equal(r.error,undefined,r.error?.message);assert.equal(r.status,0,r.stderr);}
 test('CSS writes and removals scan large separator runs within a time budget',()=>{
  bounded(`const {applyOp}=require('./src/web-model');const assert=require('node:assert/strict');
  for(const separator of ['\\n','\\r\\n',' \\n','\\u2028']){
@@ -72,9 +72,7 @@ test('case-insensitive search reports original UTF-16 offsets within a time budg
 test('browser harness keeps zygote enabled unless sandbox disabling is explicit',async t=>{
  const fs=require('node:fs');const {fixture}=require('./helpers');const o=fixture(t);const fake=path.join(o.root,'fake-chrome'),record=path.join(o.root,'flags.json');
  fs.writeFileSync(fake,'#!/usr/bin/env node\n'+`const fs=require('node:fs');fs.writeFileSync(${JSON.stringify(record)},JSON.stringify(process.argv.slice(2)));let input='';const stream=fs.createReadStream(null,{fd:3});stream.on('data',b=>{input+=b;let at;while((at=input.indexOf('\\0'))>=0){const msg=JSON.parse(input.slice(0,at));input=input.slice(at+1);const result=msg.method==='Target.createTarget'?{targetId:'target'}:msg.method==='Target.attachToTarget'?{sessionId:'session'}:{};fs.writeSync(4,JSON.stringify({id:msg.id,result})+'\\0');if(msg.method==='Browser.close')process.exit(0);}});`);fs.chmodSync(fake,0o700);
- const saved={chrome:process.env.SITE_STUDIO_CHROME,noSandbox:process.env.SITE_STUDIO_CHROME_NO_SANDBOX};
- try{process.env.SITE_STUDIO_CHROME=fake;for(const off of ['0','1']){process.env.SITE_STUDIO_CHROME_NO_SANDBOX=off;const b=await require('./browser-helper').browser();try{const flags=JSON.parse(fs.readFileSync(record));assert.equal(flags.includes('--no-sandbox'),off==='1');assert.equal(flags.includes('--no-zygote'),off==='1');}finally{await b.close();}}}
- finally{for(const [key,value] of [['SITE_STUDIO_CHROME',saved.chrome],['SITE_STUDIO_CHROME_NO_SANDBOX',saved.noSandbox]])if(value===undefined)delete process.env[key];else process.env[key]=value;}
+ for(const off of ['0','1']){const b=await require('./browser-helper').browser({SITE_STUDIO_CHROME:fake,SITE_STUDIO_CHROME_NO_SANDBOX:off});try{const flags=JSON.parse(fs.readFileSync(record));assert.equal(flags.includes('--no-sandbox'),off==='1');assert.equal(flags.includes('--no-zygote'),off==='1');}finally{await b.close();}}
 });
 
 test('preview strips referrer overrides from HTML, malformed tags and SVG',()=>{
@@ -234,7 +232,7 @@ test('preview limits count UTF-8 bytes and reject rewritten output before large 
  const source='b:url(x);'.repeat(220000);
  assert.throws(()=>previewBytes({kind:'css',path:'a.css',source},'/preview/'+'a'.repeat(24)),/preview.*limit/i);
  assert(process.resourceUsage().maxRSS*1024-before<128*1024*1024,'preview memory growth exceeds 128 MiB');`;
- const result=spawnSync(process.execPath,['--max-old-space-size=128','-e',script],{cwd:root,timeout:3000,encoding:'utf8',maxBuffer:65536});assert.equal(result.error,undefined,result.error?.message);assert.equal(result.status,0,result.stderr);
+ const result=spawnSync(process.execPath,['--max-old-space-size=128','-e',script],{cwd:root,timeout:3000,encoding:'utf8',maxBuffer:65536,env:childEnv()});assert.equal(result.error,undefined,result.error?.message);assert.equal(result.status,0,result.stderr);
 });
 
 test('preview failures are cached per snapshot across query variants',()=>{

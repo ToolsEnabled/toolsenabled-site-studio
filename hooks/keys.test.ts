@@ -19,7 +19,7 @@ const offsetOf=(e:any)=>Number(e.argv[e.argv.indexOf('--offset')+1])
 const serve=(total:number)=>(e:any)=>ok(pageOf(viewOf(e),total,offsetOf(e)))
 function world(on:any,reply:(e:any)=>any){
  const calls:any[]=[],opened:any[]=[],closed:any[]=[],leaked:string[]=[],opening:any=undefined
- mock.clock(on);mock.env(on,{PATH:'/usr/bin',SystemRoot:'C:\\Windows'})
+ mock.clock(on);mock.env(on,{PATH:'/usr/bin'})
  on('process.run',async(_:any,e:any)=>{calls.push(e);return {value:await reply(e)}})
  on('command.register',(_:any,e:any)=>({value:{command:e.name}}))
  on('ui.open',(_:any,e:any)=>{opened.push(e);return {value:{isPlaced:true}}})

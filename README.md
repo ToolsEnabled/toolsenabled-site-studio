@@ -50,6 +50,69 @@ Claude Code uses `.mcp.json` with those three explicit folder options; Codex ret
 
 Try asking your MCP host: “Read the site, update its headline, add a section, and show me the preview.” See [all tools and examples](docs/MCP.md).
 
+## What this plugin runs, sends and reads
+
+This section covers everything the Claude Code plugin runs: its MCP server, its mod (the `/site-studio` pane), and its commands and skill. Site Studio itself contacts no online service: there is no ToolsEnabled server, account, telemetry or update check. What leaves your computer is what Claude Code sends: Site Studio returns tool results to Claude Code, and Claude Code sends them to the model it uses.
+
+### MCP server
+
+Claude Code starts one local stdio server, as `.mcp.json` sets out:
+
+```sh
+node ${CLAUDE_PLUGIN_ROOT}/mcp-web.js --site ${user_config.site_directory} --data-dir ${user_config.data_directory} --export-dir ${user_config.export_directory}
+```
+
+Its environment also gets `SITE_STUDIO_ROOT` and `SITE_STUDIO_DATA` (the site and state folders) and `SystemRoot`, copied from Claude Code's environment and empty when it is not set, as on Linux and macOS; on Windows the server uses it to find PowerShell. The server:
+
+- reads the site folder at every start, without changing it;
+- keeps the working copy, history and checkpoints in the state folder (`state.json` and `working-*` folders), plus `lease.json` while it runs;
+- writes the export folder only when you confirm an export in the dashboard. While it exports, it keeps a lock file and a staging folder next to the export folder; when you export over the original site folder, it keeps the original there as a backup folder;
+- answers tool calls over stdio. Tool results can contain your site's text;
+- listens on two random ports on 127.0.0.1 only, one for the dashboard and one for the preview, and writes the one-time dashboard link to its stderr, which Claude Code keeps in its MCP log files (see [Review and save](#review-and-save));
+- makes no outgoing network requests. The preview blocks external resources unless the server is started with `--allow-external`, which this plugin does not pass;
+- checks whether a recorded Site Studio process is still running: from `/proc` on Linux, with `/bin/ps` on macOS, and with `%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe` on Windows (macOS and Windows are not qualified).
+
+### Mod: the `/site-studio` pane
+
+`hooks/hooks.json` loads one mod module, `hooks/register.tsx`. It hooks five events:
+
+| Event | What the hook does |
+| --- | --- |
+| `session.start` | Registers the `/site-studio` command, then passes the event on unchanged. It reads nothing and starts nothing. |
+| `session.end` | Clears the pane's in-memory state, then passes the event on unchanged. |
+| `ui.close`, only for the pane `site-studio-view` | `ui.close` is the event for closing a pane and also the name of the call that closes one; the mod makes that call itself when you press q or select Close. The hook clears the pane's in-memory page, so the result of a read that is still running is ignored, then passes the close on unchanged with `next(e)`. It never refuses, delays or changes a close, and it does not run for other panes. |
+| `command.run`, only for `/site-studio` | Checks the view name and arguments you typed, opens the pane and loads its first page. A request it does not accept gets the one-line reply "Use /site-studio help for views and action commands."; otherwise it returns nothing, so pane text never enters the conversation or Claude's context. |
+| `ui.render`, only for the Site Studio pane | Draws the pane's rows and buttons. |
+
+The mod's calls are `$.command.register` (adds `/site-studio`), `$.ui.open`, `$.ui.close`, `$.ui.invalidate` and `$.ui.resolve` (open, close, redraw and draw the pane), `$.env.get('PATH')` and `$.process.run`. It makes no network, file, MCP, model or prompt calls.
+
+To load a page (`hooks/register.tsx`, line 23), the mod starts one program with `$.process.run`, which takes a list of arguments and uses no shell:
+
+```sh
+/usr/bin/env -i PATH=<Claude Code's PATH> node --max-old-space-size=384 <plugin folder>/tools/site-studio-view.js <view> [<arguments>] [--assets] --site <site folder> --data-dir <state folder> --export-dir <export folder> --json --offset <n> [--snapshot <hash>]
+```
+
+The program runs in the plugin folder with a five-second time limit. `hooks/view-contract.mjs` holds the fixed parts of the command; the rest is filled in when you use the pane: the view and arguments you typed after `/site-studio`, your three folder options, the page offset and, when you page, the snapshot hash of the page you were on. Quotes, `$(…)` and `;` in your arguments stay literal text. `env -i` starts the program with an empty environment plus `PATH`, which it needs to find `node`, so none of Claude Code's other variables, such as API keys or tokens, reach it. From your computer, the mod itself reads only that `PATH` value and your three folder options. It starts the program only when you open a view other than `help`, or page or reload such a view (n, p or r): never at session start and never in the background.
+
+The program, `tools/site-studio-view.js`, writes nothing. It reads:
+
+- `state.json` in the state folder: the saved working copy, history and checkpoints;
+- `lease.json` in the state folder and, to tell whether that Site Studio server is still running, on Linux `/proc/sys/kernel/random/boot_id`, `/proc/<pid>/stat` for the recorded process, `/proc/self/ns/pid` and the host name (on macOS it runs `/bin/ps -p <pid> -o lstart=` instead);
+- for `doctor`, the names of the files in the state folder;
+- for `doctor` and `export`, the files in the site folder, to tell whether the site changed since Site Studio opened it, and whether the export folder, its parent folder and an export lock file exist.
+
+It prints one page of at most eight rows as JSON. The mod shows those rows in the pane, and nothing else receives them.
+
+### Commands and skill
+
+The four `/toolsenabled-site-studio:site-studio-*` commands and the `toolsenabled-site-studio` skill are instructions for Claude to use the MCP tools above, with Claude Code's normal permissions. They run nothing themselves.
+
+### Tests that the plugin directory flags
+
+The plugin directory's check reports `test/browser.test.js`, `test/delta.test.js`, `test/lifecycle.test.js` and `hooks/keys.test.ts` as using a credential from your computer. They are tests: the plugin never runs them, and none of them reads a key, token or password. No test contacts the hosts they name. `evil.test` is a forged `Origin` header sent to the local preview server, which must refuse the request; `example.test` is a URL inside HTML and SVG text that the test rewrites in memory; `www.w3.org` appears only in SVG and XHTML namespace names and an SVG DOCTYPE identifier, which nothing downloads. `hooks/keys.test.ts` checks the pane's keyboard keys: every key the pane shows is handled, and no key reaches the prompt. These four files read no environment variables. Their shared helpers (`test/helpers.js`, `test/browser-helper.js` and `test/mcp-helper.js`) read the settings that [docs/TESTING.md](docs/TESTING.md) describes (the browser executable, the sandbox opt-out, the evidence folder and a debug switch), and give the browser, MCP server and Node processes that these tests start only `PATH`, the temporary-folder variables, `SystemRoot` on Windows and, for the browser, `HOME`.
+
+The maintainer scripts in `tools/` are not part of what the plugin runs. Only `tools/generate-release.py` uses the network: a maintainer runs it after a release to look up the release tag with `git ls-remote` and download the release file, to compare it with the local build.
+
 ## Review and save
 
 Find `Site Studio dashboard session:` in the host's stderr logs: Claude Code on Linux uses `~/.cache/claude-cli-nodejs/<cwd-slug>/mcp-logs-site-studio/<timestamp>.jsonl` for direct registration; plugin registration uses `mcp-logs-plugin-toolsenabled-site-studio-site-studio/` instead; Desktop uses `mcp-server-<NAME>.log` under `~/Library/Logs/Claude` (macOS) or `%APPDATA%\Claude\logs` (Windows); Codex app-server can expose the line on privately captured stderr with `RUST_LOG=codex_rmcp_client=info` (the documented TUI log route remains unverified here); Cursor uses Output → MCP Logs. DeepSeek Harness inherits its launcher’s stderr; a direct Node launch prints it in that terminal. See [host-specific instructions and recovery](docs/CLAUDE-INSTALL.md#open-the-human-dashboard-before-assigning-work).
