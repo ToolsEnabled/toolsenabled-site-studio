@@ -144,7 +144,7 @@ See [testing and package reproduction](docs/TESTING.md) for the complete headles
 
 ## Privacy and support
 
-Site Studio reads the static site folder you select and maintains its private working copy on your computer. It sends selected tool results to your MCP client; that client and its model provider may process the returned site content. Site Studio has no hosted service or telemetry. External preview resources are blocked unless you explicitly opt in. Review your client's data settings before opening confidential sites. [Privacy policy](https://toolsenabled.ai/legal/privacy/). Support: support@toolsenabled.ai.
+Site Studio reads the static site folder you select and maintains its private working copy on your computer. It sends selected tool results to your MCP client; that client and its model provider may process the returned site content. Site Studio has no hosted service or telemetry. External preview resources are blocked unless you explicitly opt in. Review your client's data settings before opening confidential sites. [Privacy policy](https://toolsenabled.ai/privacy/). Support: support@toolsenabled.ai.
 
 ToolsEnabled is not affiliated with or endorsed by the listed clients or their vendors. Client configuration generation does not establish native installation or model-workflow qualification.
 

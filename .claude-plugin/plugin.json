@@ -8,8 +8,11 @@
     "email": "support@toolsenabled.ai",
     "url": "https://toolsenabled.ai"
   },
-  "homepage": "https://toolsenabled.ai",
+  "homepage": "https://toolsenabled.ai/site-studio/",
   "repository": "https://github.com/ToolsEnabled/toolsenabled-site-studio",
+  "documentationUrl": "https://github.com/ToolsEnabled/toolsenabled-site-studio#readme",
+  "privacyPolicyUrl": "https://toolsenabled.ai/privacy/",
+  "supportUrl": "https://toolsenabled.ai/support/",
   "license": "MIT",
   "keywords": [
     "static-sites",
