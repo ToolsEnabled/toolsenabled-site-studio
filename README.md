@@ -144,6 +144,11 @@ On macOS, a network change can change the hostname. If the Mac crashed before it
 
 See [testing and package reproduction](docs/TESTING.md) for the complete headless suite, browser prerequisite, stdio lifecycle test and deterministic packaging. See [state compatibility](docs/PROVENANCE.md) and the included [test report](docs/TEST-REPORT.md).
 
+Run the suite with `TMPDIR` set to a short, absolute real path of an existing folder, for example `mkdir -p /tmp/ss && TMPDIR=/tmp/ss SITE_STUDIO_CHROME=/absolute/path/to/chrome node tools/run-tests.js`. The test runner checks `TMPDIR` before it starts any test and stops with a message that names the problem:
+
+- `TMPDIR` must be absolute and must not reach its folder through a symbolic link. The tests keep their sites under `TMPDIR`, and the working-copy store refuses any path that goes through a symbolic link, by design; without this check about a third of the tests would fail with `symbolic link refused`.
+- `TMPDIR` may be at most 62 bytes long. Chrome puts its lock socket in a folder under `TMPDIR`, and a Unix socket path holds at most 107 bytes; with a longer `TMPDIR` Chrome exits at once and the fifteen browser tests would fail with a bare `read ECONNRESET`.
+
 ## Privacy and support
 
 Site Studio reads the static site folder you select and maintains its private working copy on your computer. It sends selected tool results to your MCP client; that client and its model provider may process the returned site content. Site Studio has no hosted service or telemetry. External preview resources are blocked unless you explicitly opt in. Review your client's data settings before opening confidential sites. [Privacy policy](https://toolsenabled.ai/privacy/). Support: support@toolsenabled.ai.

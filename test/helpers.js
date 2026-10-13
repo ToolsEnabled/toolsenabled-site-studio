@@ -34,4 +34,26 @@ async function saveEvidence(save) {
   const target = rel => { const file = path.join(root, rel); fs.mkdirSync(path.dirname(file), {recursive:true}); return file; };
   await save({write:(rel, data) => fs.writeFileSync(target(rel), data), copy:(rel, from) => fs.cpSync(from, target(rel), {recursive:true})});
 }
-module.exports={fixture,textOp,childEnv,saveEvidence};
+// Temporary-folder checks. tools/run-tests.js runs tmpdirProblem() before any test, and the browser helper runs
+// tmpdirLengthProblem() before it starts Chrome, so a TMPDIR that cannot work stops with one clear message instead of
+// many failures that do not name the cause (docs/TESTING.md).
+// The working-copy store refuses any path that reaches its files through a symbolic link, by design, and the tests
+// keep their sites under TMPDIR: TMPDIR must be the absolute real path of an existing folder.
+// Chrome puts its lock socket at <TMPDIR>/<name>.XXXXXX/SingletonSocket, and a Unix socket path holds at most 107
+// bytes. Google Chrome's folder name (com.google.Chrome.XXXXXX) allows a TMPDIR of up to 66 bytes; Chromium's
+// (org.chromium.Chromium.XXXXXX) up to 62. Longer, Chrome exits at once and the browser tests fail with a bare
+// "read ECONNRESET".
+const TMPDIR_MAX_BYTES = 62;
+function tmpdirLengthProblem(dir = os.tmpdir()) {
+  const bytes = Buffer.byteLength(dir);
+  if (bytes <= TMPDIR_MAX_BYTES) return '';
+  return `TMPDIR is ${bytes} bytes long (${dir}); the browser tests need at most ${TMPDIR_MAX_BYTES}. Chrome puts its lock socket in a folder under TMPDIR, and with a longer TMPDIR that socket path exceeds the Unix limit, so Chrome exits and the browser tests fail with "read ECONNRESET". Use a short folder, for example TMPDIR=/tmp/ss.`;
+}
+function tmpdirProblem(dir = os.tmpdir()) {
+  if (!path.isAbsolute(dir)) return `TMPDIR must be an absolute path; "${dir}" is relative. Set TMPDIR to the absolute real path of an existing folder, for example TMPDIR=/tmp/ss.`;
+  let real;
+  try { real = fs.realpathSync.native(dir); } catch (e) { return `TMPDIR (${dir}) cannot be used: ${e.code || e.message}. Set TMPDIR to an existing folder.`; }
+  if (real !== dir) return `TMPDIR must be its folder's real path: ${dir} resolves to ${real} (through a symbolic link, or . or .. parts). The working-copy store refuses paths that go through a symbolic link, by design. Use TMPDIR=${real}.`;
+  return tmpdirLengthProblem(dir);
+}
+module.exports={fixture,textOp,childEnv,saveEvidence,tmpdirProblem,tmpdirLengthProblem};

@@ -4,11 +4,17 @@ Linux tested; native Windows not yet supported. Runtime: Node.js 22+. Packaging 
 
 ## Full headless suite
 
-Set `SITE_STUDIO_CHROME` to your browser executable and run:
+Set `SITE_STUDIO_CHROME` to your browser executable and `TMPDIR` to a short folder, then run:
 
 ```sh
-SITE_STUDIO_CHROME=/absolute/path/to/chrome env -u DISPLAY node tools/run-tests.js
+mkdir -p /tmp/ss
+TMPDIR=/tmp/ss SITE_STUDIO_CHROME=/absolute/path/to/chrome env -u DISPLAY node tools/run-tests.js
 ```
+
+`TMPDIR` must be the absolute real path of an existing folder, at most 62 bytes long. The runner checks this before it starts any test and stops with exit status 2 and a message naming the problem; the browser helper repeats the length check when a browser test file is run on its own. The reasons:
+
+- The tests create their sites and private state under `TMPDIR`, and the working-copy store refuses any path that reaches its files through a symbolic link, by design. A relative `TMPDIR`, or one that goes through a symbolic link, would make about a third of the tests fail with `symbolic link refused`. Use the folder's real path (`realpath` prints it).
+- Chrome creates its lock socket at `<TMPDIR>/<name>.XXXXXX/SingletonSocket`, and a Unix socket path holds at most 107 bytes. With Google Chrome (`com.google.Chrome.XXXXXX`) that allows a `TMPDIR` of up to 66 bytes, measured with Google Chrome 154; Chromium's folder name (`org.chromium.Chromium.XXXXXX`) is four bytes longer, so the runner allows up to 62. With a longer `TMPDIR` Chrome exits at once and the fifteen browser tests fail with a bare `read ECONNRESET`.
 
 Native Windows is not yet supported. The PowerShell form below is kept for future Windows qualification only and has not been run for this release:
 
