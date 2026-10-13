@@ -6,7 +6,7 @@ Site Studio runs locally with Node 22 or newer. Claude Code 2.1.284 and 2.1.287 
 
 ## Claude Code
 
-Version 0.1.3 is distributed as a GitHub release archive. Marketplace and directory distribution are deferred. Download the archive from the published release, verify its announced SHA256, and extract it outside the site and private state folders. Use direct MCP registration below for tool-only clients, or load the extracted local plugin for slash commands. Neither route requires a marketplace listing.
+Version 0.1.4 is distributed as a GitHub release archive and through the repository's own plugin marketplace (see [Load the local plugin for Claude Code commands](#load-the-local-plugin-for-claude-code-commands)); public plugin directories are not used. Download `toolsenabled-site-studio-0.1.4.zip` and its `.sha256` file from the published release, verify with `sha256sum -c toolsenabled-site-studio-0.1.4.zip.sha256` (the release notes print the same hash), and extract it outside the site and private state folders; it extracts to `site-studio/`. Use direct MCP registration below for tool-only clients, or load the extracted local plugin for slash commands. Neither route requires a marketplace listing.
 
 Open a terminal in the site's project directory, then register the extracted server for that project only:
 
@@ -18,7 +18,7 @@ The print-only `tools/mcp-config.mjs --client claude` helper also produces a loc
 
 Local scope keeps the server out of unrelated projects. A session connection or `claude mcp list` can start it. Stop the existing connection before probing the same state directory, or use another state directory for a concurrent client.
 
-The site must exist. The state folder must be new or empty, private and outside the site, export folders and installation. The export destination must be new with an existing parent, outside the installation. Configuring that destination does not authorize export: the dashboard still requires human confirmation.
+The site must exist. The state folder must be new or empty, private and outside the site, export folders and installation. The export destination must be new (or the original site folder) with an existing parent, outside the installation; startup refuses a missing parent, and an existing destination other than the original is refused when the export is confirmed. Configuring that destination does not authorize export: the dashboard still requires human confirmation.
 
 Ask Claude to read the site before making focused edits, verify the result and save a checkpoint. The human must open the private one-time launch link before assigning that work. The included workflow skill documents the same boundary; host tool permissions determine whether other tools can bypass it.
 
@@ -65,7 +65,7 @@ After a qualified Desktop release exists, open its `.mcpb` in Claude Desktop on 
 
 ## Registry and directory status
 
-This release is GitHub-only. Marketplace, Registry and directory publication are deferred. The tooling below is for a later qualified publication.
+This release is distributed from GitHub: the verified release archive and the repository's own Claude Code and Codex marketplaces. MCP Registry and public plugin-directory publication are not done; the tooling below is for a later qualified publication.
 
 `server.json` is generated separately by the publisher at release time from the final production-signed artifact. It is never committed to the plugin or included in its ZIP, Desktop bundle or marketplace tree. The release URL must exist and its downloaded bytes must match the recorded digest; DNS namespace verification and production signing require the publisher’s action. Schema validity does not prove that URL is downloadable. Directory acceptance is separate: compact inherited JavaScript and generated entity tables may be held for review even though the source has no dependencies or binaries. Local validation is not portal acceptance.
 
@@ -85,26 +85,33 @@ For Site Studio’s Registry entry, pass `--description "Edit static sites in a 
 | `/site-studio find "text"` | Pane | Case-folded matches, line numbers and bounded context | `!node /absolute/site-studio/tools/site-studio-view.js find "text"` |
 | `/site-studio history` | Pane | Saved timeline with UTC times, actors, types and revisions | `!node /absolute/site-studio/tools/site-studio-view.js history` |
 | `/site-studio checkpoints` | Pane | Saved labels and counts of changed files | `!node /absolute/site-studio/tools/site-studio-view.js checkpoints` |
-| `/site-studio changes ["label" or original] ["path"]` | Pane | Changed files and a bounded line replacement diff | `!node /absolute/site-studio/tools/site-studio-view.js changes ["label"] ["path"]` |
+| `/site-studio changes ["label" or original] ["path"]` | Pane | Changed files since the latest checkpoint (the default baseline), a named checkpoint or `original`, with a bounded line replacement diff | `!node /absolute/site-studio/tools/site-studio-view.js changes ["label"] ["path"]` |
 | `/site-studio check` | Pane | Missing local HTML/CSS targets and unlinked pages; no network | `!node /absolute/site-studio/tools/site-studio-view.js check` |
 | `/site-studio dashboard` (alias `preview`) | Pane | Human dashboard instructions and current lease status | `!node /absolute/site-studio/tools/site-studio-view.js dashboard` |
 | `/site-studio export` | Pane | Advisory destination, lock and drift checks; never exports | `!node /absolute/site-studio/tools/site-studio-view.js export` |
 | `/site-studio doctor` | Pane | Saved-state/startup checks and manual recovery guidance; no repair | `!node /absolute/site-studio/tools/site-studio-view.js doctor` |
 | `/site-studio help` | Pane | Paged command names and their Codex equivalents | `!node /absolute/site-studio/tools/site-studio-view.js help` |
-| `/toolsenabled-site-studio:site-studio-edit <request>` | Action | Inspect, edit and verify the working copy | `$site-studio:toolsenabled-site-studio edit <request>` |
-| `/toolsenabled-site-studio:site-studio-new-page <path> <title>` | Action | Add and verify a named HTML page | `$site-studio:toolsenabled-site-studio new-page <path> <title>` |
-| `/toolsenabled-site-studio:site-studio-checkpoint <label>` | Action | Save an agent checkpoint; refused while paused | `$site-studio:toolsenabled-site-studio checkpoint <label>` |
-| `/toolsenabled-site-studio:site-studio-draw <path.svg> <description>` | Action | Author a safe SVG asset; reference it only if requested | `$site-studio:toolsenabled-site-studio draw <path.svg> <description>` |
+| `/toolsenabled-site-studio:site-studio-edit <request>` | Action | Inspect, edit and verify the working copy | `$toolsenabled-site-studio:toolsenabled-site-studio edit <request>` |
+| `/toolsenabled-site-studio:site-studio-new-page <path> <title>` | Action | Add and verify a named HTML page | `$toolsenabled-site-studio:toolsenabled-site-studio new-page <path> <title>` |
+| `/toolsenabled-site-studio:site-studio-checkpoint <label>` | Action | Save an agent checkpoint; refused while paused | `$toolsenabled-site-studio:toolsenabled-site-studio checkpoint <label>` |
+| `/toolsenabled-site-studio:site-studio-draw <path.svg> <description>` | Action | Author a safe SVG asset; reference it only if requested | `$toolsenabled-site-studio:toolsenabled-site-studio draw <path.svg> <description>` |
 
 Claude Code panes require the local plugin loaded in Code 2.1.287 or newer; a direct MCP registration alone does not load them. Views start only the installed read-only runtime child, never MCP tools or model work. Use n/p to page, r to reload, 1–8 for row detail (b returns), and Esc or q to close. The pane keeps the keyboard while open: a key that does not apply in the current state shows a short hint instead of reaching the prompt, and the footer lists only the keys that apply. The pane shows the revision and a short snapshot digest. A saved-state change clears stale pages. Text is sanitized and truncated; these are summaries, not a full source viewer. No automatic polling, lease acquisition, state writes or launch-log reads occur.
 
 Use the **fully qualified action names** above. In the tested 2.1.287 build, the unprefixed action names do not resolve. Actions start normal model work and retain host permissions. Pause, undo, restore and export remain human dashboard actions.
 
-Codex has no plugin-defined slash-command pane API in the tested client. The bang commands above are an explicit local CLI alternative, not a Codex pane. Replace `/absolute/site-studio` with the extracted plugin path. Set `SITE_STUDIO_ROOT` and `SITE_STUDIO_DATA` to the same absolute paths as the MCP server, or append `--site /absolute/site --data-dir /absolute/private-state` to each command. Append `--export-dir /absolute/export` to display that configured destination. Absent both explicit and environment paths, the CLI uses the server's bundled sample and `~/.site-studio/<site-hash>` defaults. It never searches for another running server or creates a missing state folder; it displays “not opened yet”. Use `--allow-external` only to match a server started with that policy. For later pages it prints the exact `--offset` and `--snapshot` flags to add. Codex may include bang-command output in subsequent model context; Claude pane bodies stay outside it. The exact Codex plugin skill name was verified with no-model `plugin/read`: `site-studio:toolsenabled-site-studio`. Skill equivalents require that plugin/skill to be loaded and are model actions, not instant views. For a locally installed Codex plugin, its cache path is `<CODEX_HOME>/plugins/cache/<marketplace>/site-studio/<version>/`; obtain the literal path from the client's plugin details. GitHub extraction can use any selected absolute folder. Marketplace publication remains deferred.
+Codex has no plugin-defined slash-command pane API in the tested client. The bang commands above are an explicit local CLI alternative, not a Codex pane. Replace `/absolute/site-studio` with the extracted plugin path. Set `SITE_STUDIO_ROOT` and `SITE_STUDIO_DATA` to the same absolute paths as the MCP server, or append `--site /absolute/site --data-dir /absolute/private-state` to each command. Append `--export-dir /absolute/export` to display that configured destination. Absent both explicit and environment paths, the CLI uses the server's bundled sample and `~/.site-studio/<site-hash>` defaults. It never searches for another running server or creates a missing state folder; it displays “not opened yet”. Use `--allow-external` only to match a server started with that policy. For later pages it prints the exact `--offset` and `--snapshot` flags to add. Codex may include bang-command output in subsequent model context; Claude pane bodies stay outside it. The Codex skill name is the plugin name followed by the skill folder name, `toolsenabled-site-studio:toolsenabled-site-studio` with this release's manifest; the 0.1.3 name `site-studio:toolsenabled-site-studio` was verified with no-model `plugin/read`, and the renamed form has not been re-verified in a Codex client. Skill equivalents require that plugin/skill to be loaded and are model actions, not instant views. For a Codex plugin installed from the repository marketplace, its cache path is `<CODEX_HOME>/plugins/cache/<marketplace>/toolsenabled-site-studio/<version>/`; obtain the literal path from the client's plugin details. GitHub extraction can use any selected absolute folder.
 
 ## Load the local plugin for Claude Code commands
 
-Use the verified extracted GitHub folder directly; no marketplace is needed. Stop/remove a duplicate direct MCP registration for the same state directory before loading the plugin. In the project, merge these nonsecret folder options into `.claude/settings.local.json` (preserve any existing settings):
+Install from the repository marketplace, or use the verified extracted GitHub folder directly. From the marketplace:
+
+```sh
+claude plugin marketplace add ToolsEnabled/toolsenabled-site-studio
+claude plugin install toolsenabled-site-studio@toolsenabled-site-studio --config site_directory=/absolute/site --config data_directory=/absolute/private-state --config export_directory=/absolute/new-export
+```
+
+`claude plugin configure toolsenabled-site-studio@toolsenabled-site-studio` shows or changes those options later, and a marketplace-installed plugin loads in every session without `--plugin-dir`. Stop/remove a duplicate direct MCP registration for the same state directory before loading the plugin. For the extracted folder instead, merge these nonsecret folder options into `.claude/settings.local.json` in the project (preserve any existing settings):
 
 ```json
 {

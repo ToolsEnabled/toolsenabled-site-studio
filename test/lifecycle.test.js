@@ -2,7 +2,7 @@
 const test=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const path=require('node:path');const {fixture}=require('./helpers');const {start}=require('./mcp-helper');
 test('stdio golden tools/list and two-page edit checkpoint undo export lifecycle',async t=>{
   const o=fixture(t),original=fs.readFileSync(path.join(o.sourceRoot,'index.html')),child=start(o);t.after(()=>child.stop());
-  const initialized=await child.init();assert.equal(initialized.result.serverInfo.name,'toolsenabled-site-studio');assert.equal(initialized.result.serverInfo.version,'0.1.3');assert.equal(require('../package.json').version,'0.1.3');assert.equal(require('../.codex-plugin/plugin.json').version,'0.1.3');
+  const initialized=await child.init();assert.equal(initialized.result.serverInfo.name,'toolsenabled-site-studio');assert.equal(initialized.result.serverInfo.version,'0.1.4');assert.equal(require('../package.json').version,'0.1.4');assert.equal(require('../.codex-plugin/plugin.json').version,'0.1.4');
   const list=await child.rpc('tools/list');assert.deepEqual(list.result.tools,JSON.parse(fs.readFileSync(path.join(__dirname,'tools-list.golden.json'))));assert(!list.result.tools.some(t=>/undo|pause|redo|export|restore/.test(t.name)));
   let pages=await child.tool('web_pages');assert.equal(pages.files.filter(f=>f.kind==='html').length,2);
   async function edit(name,make){pages=await child.tool('web_pages');const f=pages.files.find(f=>f.path==='index.html');return child.tool(name,{expected_rev:pages.rev,...make(f,pages)});}

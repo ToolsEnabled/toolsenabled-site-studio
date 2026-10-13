@@ -21,7 +21,10 @@ test('page source, CSS rules and folded search are bounded and pinned',t=>{
 test('changes lists added/removed/modified and bounded line replacements without asset bodies',t=>{
  const o=fixture(t),s=createStore(o);t.after(()=>s.close());s.checkpoint('Before change',0);s.edit(textOp(s.model,'After'));
  s.edit({type:'add_page',expectedRev:1,path:'new.html',title:'New'});
- const changes=all(o,'changes',['Before change']);assert(changes.includes('modified index.html'));assert(changes.includes('added new.html'));
+ const changes=all(o,'changes',['Before change']);assert(changes.includes('modified index.html'));assert(changes.includes('added new.html'));assert(changes.includes('2 changed files since checkpoint Before change (r0).'),changes);
+ const latest=all(o,'changes');assert(latest.includes('since checkpoint Before change (r0). Default baseline is the latest checkpoint; use `changes original` for the opened original.'),latest);
+ s.checkpoint('After change',2);const quiet=all(o,'changes');assert(quiet.includes('No changes since checkpoint After change (r2).'),quiet);assert(!quiet.includes('modified'));
+ assert(all(o,'changes',['original']).includes('2 changed files since the opened original (r0).'));assert(all(o,'changes',['After change','index.html']).includes('No recorded change for this file since checkpoint After change (r2).'));
  const diff=all(o,'changes',['Before change','index.html']);assert(diff.includes('- '));assert(diff.includes('+ '));assert(diff.includes('After'));
  assert.equal(run(o,'changes',['unknown']).status,1);
 });

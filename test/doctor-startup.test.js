@@ -1,6 +1,6 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
-const {fixture}=require('./helpers'),{view}=require('../src/site-view');
+const {fixture}=require('./helpers'),{view}=require('../src/site-view'),{createStore}=require('../src/studio-store');
 async function rows(o){let p=await view({...o,view:'doctor'}),out=p.rows;while(p.nextOffset!==null){p=await view({...o,view:'doctor',offset:p.nextOffset,snapshot:p.snapshot});out=out.concat(p.rows);}return out.join('\n');}
 test('unopened doctor distinguishes missing folders, empty state and non-empty startup refusal without writes',async t=>{
  const o=fixture(t);let text=await rows(o);assert(text.includes('not opened yet'));assert(text.includes('State folder: not created'));assert(!fs.existsSync(o.dataRoot));
@@ -15,4 +15,7 @@ test('unopened doctor checks source and export parents and never repairs unverif
  const text=await rows({...o,sourceRoot:path.join(o.root,'missing-source'),exportRoot:path.join(o.root,'missing-parent/export')});
  assert(text.includes('Site folder: missing or inaccessible'));assert(text.includes('Export parent: missing or inaccessible'));assert(text.includes('unverifiable'));assert(!text.includes(o.root));assert.deepEqual(fs.readFileSync(lease),before);
  assert(!fs.existsSync(path.join(o.root,'missing-parent')));assert(!fs.existsSync(path.join(o.root,'missing-source')));
+ const parentOnly={...o,exportRoot:path.join(o.root,'missing-parent','export')};
+ assert.throws(()=>createStore(parentOnly),/export parent folder must already exist/);
+ assert(!fs.existsSync(path.join(o.root,'missing-parent')));assert.deepEqual(fs.readFileSync(lease),before,'a refused export parent must not touch the state folder');
 });

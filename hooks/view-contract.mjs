@@ -7,7 +7,7 @@ export const HELP = [
     return '/site-studio '+usage+' · Codex: !node <installed-plugin>/tools/site-studio-view.js '+usage;
   }),
   ...['edit <request>','new-page <path> <title>','checkpoint <label>','draw <path.svg> <description>'].map(action=>
-    '/toolsenabled-site-studio:site-studio-'+action+' · Codex: $site-studio:toolsenabled-site-studio '+action),
+    '/toolsenabled-site-studio:site-studio-'+action+' · Codex: $toolsenabled-site-studio:toolsenabled-site-studio '+action),
   'Use the full plugin prefix; unprefixed action names do not resolve in Claude Code 2.1.287.',
   'Actions start model work with normal tool permissions. Views never call MCP or a model.',
   'Pause, undo, restore, delete, export and session renewal belong to the human dashboard.',

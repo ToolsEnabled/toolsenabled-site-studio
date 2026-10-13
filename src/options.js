@@ -1,5 +1,5 @@
 'use strict';
 const path=require('node:path');
-function absolutePath(value,name,paths=path){if(typeof value!=='string'||!paths.isAbsolute(value)||value.startsWith('~')||paths===path.win32&&paths.parse(value).root.length===1)throw Error(name+' requires an absolute path with a drive or share on Windows; expand ~ in your terminal first');return value;}
+function absolutePath(value,name,paths=path){if(typeof value!=='string'||!paths.isAbsolute(value)||value.startsWith('~')||paths===path.win32&&paths.parse(value).root.length===1)throw Error(name+(paths===path.win32?' requires an absolute path with a drive or share on Windows; expand ~ in your terminal first':' requires an absolute path (expand ~ in your terminal first)'));return value;}
 function options(args){const out={};const map={'--site':'sourceRoot','--data-dir':'dataRoot','--export-dir':'exportRoot','--port':'port'};for(let i=0;i<args.length;i++){const arg=args[i];if(arg==='--allow-external'){out.allowExternal=true;continue;}if(!map[arg]||i+1===args.length||args[i+1].startsWith('--'))throw Error('Usage: node mcp-web.js [--site FOLDER] [--data-dir FOLDER] [--export-dir FOLDER] [--port 0] [--allow-external]');const val=args[++i];out[map[arg]]=arg==='--port'?Number(val):absolutePath(val,arg);}return out;}
 module.exports={options,absolutePath};

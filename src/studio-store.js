@@ -34,6 +34,9 @@ function* storeSteps(options={}) {
   if(within(dataRoot,installRoot)||exportRoot&&within(exportRoot,installRoot))throw Error('state and export folders must be outside the plugin installation');
   if(within(sourceRoot,dataRoot)||within(dataRoot,sourceRoot))throw Error('source and state roots must not overlap');
   if(exportRoot&&(within(exportRoot,dataRoot)||within(dataRoot,exportRoot)||exportRoot!==sourceRoot&&(within(exportRoot,sourceRoot)||within(sourceRoot,exportRoot))))throw Error('overlapping export root refused');
+  // Site Studio never creates the export parent, so a missing one is refused here before any state exists. An existing
+  // destination is rechecked when the human confirms export, which keeps a restart after an export working.
+  if(exportRoot){let parent;try{parent=fs.statSync(path.dirname(exportRoot));}catch(e){if(e.code!=='ENOENT')throw e;throw Error('export parent folder must already exist; create it or choose another --export-dir');}if(!parent.isDirectory())throw Error('export parent must be a directory');}
   fs.mkdirSync(dataRoot,{recursive:true,mode:0o700});checkedPath(dataRoot);const st=fs.statSync(dataRoot);if(process.platform!=='win32'&&(st.mode&0o077))throw Error('state root must have private permissions (chmod 700)');
   const releaseLease=require('./state-lease').acquireLease(dataRoot);
   let closed=false,handedOff=false,durabilityWarning=null;

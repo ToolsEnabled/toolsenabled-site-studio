@@ -174,11 +174,17 @@ function project({state:s,sourceRoot,dataRoot,exportRoot,stateBytes,view,args=[]
   rows.push('Restore and delete are human dashboard controls.');
  }
  if(view==='changes'){
-  if(args.length>2)throw Error('VIEW_ARGUMENTS');const target=args[0]==='original'?s.openedModel:args[0]?s.checkpoints.find((c,i)=>label(c,i)===args[0])?.model:s.checkpoints.at(-1)?.model||s.openedModel;
+  if(args.length>2)throw Error('VIEW_ARGUMENTS');const latest=s.checkpoints.at(-1);
+  const target=args[0]==='original'?s.openedModel:args[0]?s.checkpoints.find((c,i)=>label(c,i)===args[0])?.model:latest?.model||s.openedModel;
   if(!target)throw Error('VIEW_NOT_FOUND');const changes=changedFiles(target,model);
-  if(!args[1])for(const c of changes)rows.push(c.kind+' '+text(c.name)+' · '+(c.delta>=0?'+':'')+c.delta+' bytes');
-  else{
-   const c=changes.find(c=>c.name===args[1]);if(!c)rows.push('No recorded change for this file.');
+  // Name the baseline: the default is the latest checkpoint, so an empty list must not read as "nothing changed".
+  const since=target===s.openedModel?'the opened original (r0)':'checkpoint '+text(args[0]||label(latest,s.checkpoints.length-1))+' (r'+target.rev+')';
+  const hint=!args[0]&&latest?' Default baseline is the latest checkpoint; use `changes original` for the opened original.':'';
+  if(!args[1]){
+   rows.push((changes.length?changes.length+(changes.length===1?' changed file since ':' changed files since '):'No changes since ')+since+'.'+hint);
+   for(const c of changes)rows.push(c.kind+' '+text(c.name)+' · '+(c.delta>=0?'+':'')+c.delta+' bytes');
+  }else{
+   const c=changes.find(c=>c.name===args[1]);if(!c)rows.push('No recorded change for this file since '+since+'.'+hint);
    else if(c.a?.kind==='asset'||c.b?.kind==='asset')rows.push('Asset '+text(c.name)+' changed; body withheld.');
    else{
     rows.push('Bounded line replacement diff; not a minimal diff. At most 200 lines per side, first 64 KiB per file.');

@@ -1,0 +1,20 @@
+{
+  "name": "toolsenabled-site-studio",
+  "interface": {
+    "displayName": "ToolsEnabled Site Studio"
+  },
+  "plugins": [
+    {
+      "name": "toolsenabled-site-studio",
+      "source": {
+        "source": "local",
+        "path": "./"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

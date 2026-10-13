@@ -1,6 +1,16 @@
 # Changelog
 
-## 0.1.3 — Unreleased
+## 0.1.4 — 2026-10-13
+
+- Refuse startup when the `--export-dir` parent folder does not exist, before any state is created; an existing destination is still checked when the human confirms export, so a server can restart after exporting.
+- Name the baseline of the `changes` view (latest checkpoint by default, a named checkpoint, or `original`) in its first row and in the command tables, and say when nothing changed since it instead of showing an empty list.
+- Refuse non-absolute folder paths on Linux and macOS with a plain "requires an absolute path" message; the drive-or-share wording appears only on Windows.
+- Make the repository its own plugin marketplace for Claude Code (`.claude-plugin/marketplace.json`) and Codex (`.agents/plugins/marketplace.json`), ship both files in the archive, and document the marketplace add and install commands.
+- Name the Codex plugin `toolsenabled-site-studio` like the Claude manifest and add its homepage, repository and license fields; the Codex skill name becomes `toolsenabled-site-studio:toolsenabled-site-studio`.
+- Ship the company-wide security policy and safe harbor at the top of SECURITY.md, with this release's security boundaries kept below it.
+- Document release verification (`sha256sum -c` against the `.sha256` asset, `unzip`, extracts to `site-studio/`), date the 0.1.3 entry, and record the 0.1.3 and 0.1.4 full-suite results in the test report.
+
+## 0.1.3 — 2026-10-13
 
 - Add Claude Code panes for working-copy status, pages and source, search, changes, references, history, checkpoints, startup diagnostics and human dashboard/export guidance, with bounded local reads, snapshot paging and terminal sanitization.
 - Add explicit edit, new-page, checkpoint and SVG action commands using ordinary model and tool permissions; document exact command names and Codex CLI/skill equivalents.
