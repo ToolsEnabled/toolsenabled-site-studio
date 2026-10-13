@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.9 — 2026-10-13
+
+Codex self-distribution fixes; the server, tools, pane and mod are unchanged:
+
+- Codex no longer tries to read `hooks/hooks.json`, the Claude Code `/site-studio` mod, as a Codex hook file, which it cannot parse. `.codex-plugin/plugin.json` declares `"hooks": {}`; an explicit `hooks` value replaces Codex's default hooks-file discovery, and an empty one adds no hooks. Claude Code is unaffected.
+- The Codex listing in `.codex-plugin/plugin.json` gains `interface.websiteURL` (https://toolsenabled.ai/site-studio/), `supportURL` (https://toolsenabled.ai/support/) and `privacyPolicyURL` (https://toolsenabled.ai/privacy/), and `developerName` is "ToolsEnabled, Inc.", as in `author`.
+- `test/claude-package.test.js` now also pins the empty `hooks` object, the publisher and the three listing links; the suite runs the same tests as 0.1.8.
+
 ## 0.1.8 — 2026-10-13
 
 Directory-compliance fixes; the server, tools and pane are unchanged:
