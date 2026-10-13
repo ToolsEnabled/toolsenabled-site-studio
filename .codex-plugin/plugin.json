@@ -1,6 +1,6 @@
 {
   "name": "toolsenabled-site-studio",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Build and edit static sites in an isolated working copy, with live preview and human-controlled export.",
   "author": {
     "name": "ToolsEnabled, Inc.",

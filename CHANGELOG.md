@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.8 — 2026-10-13
+
+Directory-compliance fixes; the server, tools and pane are unchanged:
+
+- README: a "Try it" section gives the shortest path from nothing to a working result: copy the bundled sample site, make a private state folder, install the plugin with the three folder options, then three prompts (list the pages, change the headline and save a checkpoint, `/site-studio history`), each with the result it shows. No account or API key is needed. It replaces the one-line example under "Connect a client".
+- SECURITY.md cites this repository's LICENSE (MIT) for "as is". https://toolsenabled.ai/terms/ covers only Fleet and the website.
+- The skill no longer gives the model the path of the log that holds the one-time dashboard link. It tells the human to find the `Site Studio dashboard session:` line in their MCP host's log, as the README explains; the rest of the skill is unchanged.
+
 ## 0.1.7 — 2026-10-13
 
 Fixes the five findings of a code review of 0.1.6:
