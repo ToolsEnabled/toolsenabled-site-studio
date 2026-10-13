@@ -48,7 +48,23 @@ codex plugin marketplace add ToolsEnabled/toolsenabled-site-studio
 
 Claude Code uses `.mcp.json` with those three explicit folder options; Codex retains the sample-default configuration inline in `.codex-plugin/plugin.json`. The registration helper above remains available for other MCP hosts. The Claude Code marketplace add and install were exercised from a local clone with Claude Code 2.1.296 in a scratch configuration; the Codex marketplace file follows OpenAI's published repository-marketplace format and was not exercised in a Codex client for this release. Installing from this repository's marketplace does not depend on any public plugin directory. See [Claude installation and packaging](docs/CLAUDE-INSTALL.md).
 
-Try asking your MCP host: “Read the site, update its headline, add a section, and show me the preview.” See [all tools and examples](docs/MCP.md).
+## Try it
+
+No account or API key is needed: Site Studio runs on your computer and calls no model or online service of its own. In the extracted release ZIP's `site-studio/` folder (or a clone), copy the bundled sample site and make a private state folder, then install the plugin with the three folder options (the export folder must not exist yet; its parent must):
+
+```sh
+mkdir -p /absolute/try && cp -r site /absolute/try/site && mkdir -m 700 /absolute/try/state
+claude plugin marketplace add ToolsEnabled/toolsenabled-site-studio
+claude plugin install toolsenabled-site-studio@toolsenabled-site-studio --config site_directory=/absolute/try/site --config data_directory=/absolute/try/state --config export_directory=/absolute/try/export
+```
+
+Start `claude`, open the one-time dashboard link from its MCP log to watch the preview (see [Review and save](#review-and-save)), approve each Site Studio tool call when asked, and try these three prompts:
+
+1. `List the pages of my site.` Claude calls `web_pages` and lists `about.html`, `index.html` and `styles.css` at revision 0.
+2. `Change the headline on index.html to "Hello from Site Studio", then save a checkpoint named first-edit.` Claude reads the page, replaces the `<h1>` text with `web_set_text` (revision 1) and saves the checkpoint `first-edit`. `/absolute/try/site` itself stays unchanged.
+3. `/site-studio history` opens the read-only pane: `Opened working copy` at r0, then `Updated text · index.html` and `Saved checkpoint · first-edit` at r1.
+
+See [all tools and examples](docs/MCP.md).
 
 ## What this plugin runs, sends and reads
 
