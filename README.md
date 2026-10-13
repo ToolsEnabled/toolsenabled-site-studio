@@ -46,7 +46,7 @@ For Codex, add the same repository as a marketplace, then install ToolsEnabled S
 codex plugin marketplace add ToolsEnabled/toolsenabled-site-studio
 ```
 
-Claude Code uses `.mcp.json` with those three explicit folder options; Codex retains the sample-default configuration inline in `.codex-plugin/plugin.json`. The registration helper above remains available for other MCP hosts. The Claude Code marketplace add and install were exercised from a local clone with Claude Code 2.1.296 in a scratch configuration; the Codex marketplace file follows OpenAI's published repository-marketplace format and was not exercised in a Codex client for this release. Public plugin directories are not used. See [Claude installation and packaging](docs/CLAUDE-INSTALL.md).
+Claude Code uses `.mcp.json` with those three explicit folder options; Codex retains the sample-default configuration inline in `.codex-plugin/plugin.json`. The registration helper above remains available for other MCP hosts. The Claude Code marketplace add and install were exercised from a local clone with Claude Code 2.1.296 in a scratch configuration; the Codex marketplace file follows OpenAI's published repository-marketplace format and was not exercised in a Codex client for this release. Installing from this repository's marketplace does not depend on any public plugin directory. See [Claude installation and packaging](docs/CLAUDE-INSTALL.md).
 
 Try asking your MCP host: “Read the site, update its headline, add a section, and show me the preview.” See [all tools and examples](docs/MCP.md).
 
