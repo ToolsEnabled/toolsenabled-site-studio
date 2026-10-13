@@ -38,4 +38,22 @@ TOOLS.push({name:'web_checkpoint',description:'Save a named checkpoint of the cu
 TOOLS.push({name:'web_preview',description:'Return the loopback live-preview URL and current revision. The human dashboard controls pause, undo, restore and confirmed export. No screenshot is captured.',inputSchema:schema({})});
 // Even six-byte JSON escapes across every string field fit in one frame.
 for(const tool of TOOLS)for(const p of Object.values(tool.inputSchema.properties))if(p.type==='string')p.maxLength=Math.min(p.maxLength??8192,8192);
+// MCP tool annotations, decided from the handlers (mcp-web.js call(), src/studio-store.js edit() and checkpoint()).
+// Reads change nothing. Every change needs expected_rev; an edit moves the revision on (src/web-model.js applyOp) and a
+// checkpoint label must be unique, so an identical repeat is refused (idempotent). Changes are destructive: an edit can
+// overwrite or remove content and clears the redo list, and any change can drop the oldest undo states or timeline
+// entries. Every tool works on this computer only; web_preview returns loopback addresses of the plugin's own listeners.
+const reads = title => ({title, readOnlyHint:true, destructiveHint:false, openWorldHint:false});
+const changes = title => ({title, readOnlyHint:false, destructiveHint:true, idempotentHint:true, openWorldHint:false});
+const ANNOTATIONS = {
+  web_pages:reads('List pages and nodes'), web_read:reads('Read file source'), web_find:reads('Find text'), web_css:reads('Read CSS rules'),
+  web_set_text:changes('Set node text'), web_set_attr:changes('Set node attribute'), web_css_set:changes('Set CSS rule'),
+  web_insert_section:changes('Insert section'), web_remove:changes('Remove node'), web_move:changes('Move node'),
+  web_add_page:changes('Add page'), web_draw:changes('Draw SVG asset'), web_screenshot_note:reads('Revision and file count'),
+  web_timeline:reads('Read timeline'), web_checkpoint:changes('Save checkpoint'), web_preview:reads('Get preview links'),
+};
+for (const tool of TOOLS) {
+  if (!ANNOTATIONS[tool.name]) throw Error('tool without reviewed annotations: ' + tool.name);
+  tool.annotations = ANNOTATIONS[tool.name];
+}
 module.exports={TOOLS,mutations};

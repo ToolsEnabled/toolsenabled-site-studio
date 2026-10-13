@@ -29,6 +29,12 @@
       },
       "required": [],
       "additionalProperties": false
+    },
+    "annotations": {
+      "title": "List pages and nodes",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
     }
   },
   {
@@ -57,6 +63,12 @@
         "file_id"
       ],
       "additionalProperties": false
+    },
+    "annotations": {
+      "title": "Read file source",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
     }
   },
   {
@@ -81,6 +93,12 @@
         "query"
       ],
       "additionalProperties": false
+    },
+    "annotations": {
+      "title": "Find text",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
     }
   },
   {
@@ -104,6 +122,12 @@
         "selector"
       ],
       "additionalProperties": false
+    },
+    "annotations": {
+      "title": "Read CSS rules",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
     }
   },
   {
@@ -140,6 +164,13 @@
         "expected_rev"
       ],
       "additionalProperties": false
+    },
+    "annotations": {
+      "title": "Set node text",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": false
     }
   },
   {
@@ -182,6 +213,13 @@
         "expected_rev"
       ],
       "additionalProperties": false
+    },
+    "annotations": {
+      "title": "Set node attribute",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": false
     }
   },
   {
@@ -218,6 +256,13 @@
         "expected_rev"
       ],
       "additionalProperties": false
+    },
+    "annotations": {
+      "title": "Set CSS rule",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": false
     }
   },
   {
@@ -266,6 +311,13 @@
         "expected_rev"
       ],
       "additionalProperties": false
+    },
+    "annotations": {
+      "title": "Insert section",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": false
     }
   },
   {
@@ -296,6 +348,13 @@
         "expected_rev"
       ],
       "additionalProperties": false
+    },
+    "annotations": {
+      "title": "Remove node",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": false
     }
   },
   {
@@ -344,6 +403,13 @@
         "expected_rev"
       ],
       "additionalProperties": false
+    },
+    "annotations": {
+      "title": "Move node",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": false
     }
   },
   {
@@ -374,6 +440,13 @@
         "expected_rev"
       ],
       "additionalProperties": false
+    },
+    "annotations": {
+      "title": "Add page",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": false
     }
   },
   {
@@ -404,6 +477,13 @@
         "expected_rev"
       ],
       "additionalProperties": false
+    },
+    "annotations": {
+      "title": "Draw SVG asset",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": false
     }
   },
   {
@@ -414,6 +494,12 @@
       "properties": {},
       "required": [],
       "additionalProperties": false
+    },
+    "annotations": {
+      "title": "Revision and file count",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
     }
   },
   {
@@ -431,6 +517,12 @@
       },
       "required": [],
       "additionalProperties": false
+    },
+    "annotations": {
+      "title": "Read timeline",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
     }
   },
   {
@@ -455,6 +547,13 @@
         "expected_rev"
       ],
       "additionalProperties": false
+    },
+    "annotations": {
+      "title": "Save checkpoint",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": false
     }
   },
   {
@@ -465,6 +564,12 @@
       "properties": {},
       "required": [],
       "additionalProperties": false
+    },
+    "annotations": {
+      "title": "Get preview links",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
     }
   }
 ]

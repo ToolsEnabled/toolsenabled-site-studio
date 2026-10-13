@@ -72,6 +72,8 @@ Its environment also gets `SITE_STUDIO_ROOT` and `SITE_STUDIO_DATA` (the site an
 - makes no outgoing network requests. The preview blocks external resources unless the server is started with `--allow-external`, which this plugin does not pass;
 - checks whether a recorded Site Studio process is still running: from `/proc` on Linux, with `/bin/ps` on macOS, and with `%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe` on Windows (macOS and Windows are not qualified).
 
+Every tool declares the MCP annotations `title`, `readOnlyHint`, `destructiveHint` and `openWorldHint`, plus `idempotentHint` for the nine tools that change the working copy or its checkpoints: seven tools only read, those nine are marked destructive, and none reaches beyond your computer.
+
 ### Mod: the `/site-studio` pane
 
 `hooks/hooks.json` loads one mod module, `hooks/register.tsx`. It hooks five events:

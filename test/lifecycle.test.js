@@ -25,6 +25,34 @@ test('stdio golden tools/list and two-page edit checkpoint undo export lifecycle
   await saveEvidence(e=>{e.copy('lifecycle/original',o.sourceRoot);e.copy('lifecycle/export',o.exportRoot);const crypto=require('node:crypto');const hashes={};for(const rel of ['index.html','styles.css','nested/about.html','nested/pixel.png','art/mark.svg'])hashes[rel]=crypto.createHash('sha256').update(fs.readFileSync(path.join(o.exportRoot,rel))).digest('hex');e.write('lifecycle/receipt.json',JSON.stringify({ok:true,tools:list.result.tools.length,pages:2,edits:['text','attribute','CSS','section','SVG'],checkpoint:'Designed',exportRevision:7,restoredAndRestartedRevision:8,originalUnchanged:true,binaryPreserved:true,exitCode:0,leaseReleased:true,bothPortsRebound:true,dashboardSessionRequired:true,sha256:hashes},null,2)+'\n');e.write('lifecycle/mcp-responses.json',JSON.stringify(child.output,null,2)+'\n');});
 
 });
+// Reviewed MCP tool annotations. Seven tools only read the working copy. The nine that change it or its checkpoints
+// are destructive (an edit can overwrite or remove content and clears redo; any change can drop the oldest undo states or
+// timeline entries) and idempotent (an identical repeat is refused: edits need the current expected_rev and move it on,
+// checkpoint labels must be unique). Nothing reaches beyond this computer. Changing a value here must be deliberate.
+const READS={readOnlyHint:true,destructiveHint:false,openWorldHint:false};
+const CHANGES={readOnlyHint:false,destructiveHint:true,idempotentHint:true,openWorldHint:false};
+const REVIEWED_ANNOTATIONS={
+  web_pages:{title:'List pages and nodes',...READS}, web_read:{title:'Read file source',...READS},
+  web_find:{title:'Find text',...READS}, web_css:{title:'Read CSS rules',...READS},
+  web_set_text:{title:'Set node text',...CHANGES}, web_set_attr:{title:'Set node attribute',...CHANGES},
+  web_css_set:{title:'Set CSS rule',...CHANGES}, web_insert_section:{title:'Insert section',...CHANGES},
+  web_remove:{title:'Remove node',...CHANGES}, web_move:{title:'Move node',...CHANGES},
+  web_add_page:{title:'Add page',...CHANGES}, web_draw:{title:'Draw SVG asset',...CHANGES},
+  web_screenshot_note:{title:'Revision and file count',...READS}, web_timeline:{title:'Read timeline',...READS},
+  web_checkpoint:{title:'Save checkpoint',...CHANGES}, web_preview:{title:'Get preview links',...READS},
+};
+test('every tool the stdio server lists declares its reviewed MCP annotations',async t=>{
+  const child=start(fixture(t));t.after(()=>child.stop());await child.init();
+  const tools=(await child.rpc('tools/list')).result.tools;
+  assert.equal(tools.length,Object.keys(REVIEWED_ANNOTATIONS).length);
+  for(const tool of tools){
+    const a=tool.annotations;
+    assert.equal(typeof a?.title,'string',tool.name+' lacks a title');assert(a.title.trim(),tool.name+' has an empty title');
+    assert.equal(typeof a.readOnlyHint,'boolean',tool.name+' lacks readOnlyHint');
+    assert.equal(typeof a.destructiveHint,'boolean',tool.name+' lacks destructiveHint');
+  }
+  assert.deepEqual(Object.fromEntries(tools.map(tool=>[tool.name,tool.annotations])),REVIEWED_ANNOTATIONS);
+});
 test('stdio validates protocol and tool arguments, refuses stale edits and settles EOF',async t=>{
  const o=fixture(t),c=start(o);t.after(()=>c.stop());assert.equal((await c.rpc('tools/list')).error.code,-32002);await c.init();assert.deepEqual((await c.rpc('ping')).result,{});assert.equal((await c.rpc('not/a/method')).error.code,-32601);const p=await c.tool('web_pages');const f=p.files.find(f=>f.path==='index.html'),node_id=f.nodes.find(n=>n.selectorHint==='h1').id;
  for(const args of [{file_id:f.id,node_id,text:'x'},{file_id:f.id,node_id,text:1,expected_rev:0},{file_id:f.id,node_id,text:'x',expected_rev:0,other:1},{file_id:f.id,node_id,text:'x',expected_rev:-1}])assert.equal((await c.rpc('tools/call',{name:'web_set_text',arguments:args})).result.isError,true);
