@@ -1,6 +1,6 @@
 # Export policy choices for Site Studio 0.1.4
 
-**Owner decision OPEN.** The current implementation requires dashboard-session authorization and explicit confirmation. The proposed agent-export path below is **PREPARED ONLY: NOT IMPLEMENTED, NOT SUPPORTED**. Preparing this document neither changes that boundary nor selects a policy.
+The current implementation requires dashboard-session authorization and explicit confirmation. The agent-export path below is a proposed design: it is not implemented and not supported, and this document does not change that boundary.
 
 ## Verified current boundary
 
@@ -23,7 +23,7 @@ Adoption keeps the existing runtime. The README now states the bridge limitation
 
 ## Choice B — explicit human opt-in and audited agent export
 
-**PROPOSED DESIGN — PREPARED ONLY, NOT IMPLEMENTED OR SUPPORTED IN 0.1.4.** There is no assigned flag name, token syntax, configuration key or MCP tool name for this proposal. Do not turn the design into invocation instructions before implementation, review and owner approval.
+**Proposed design, not implemented or supported in 0.1.4.** There is no assigned flag name, token syntax, configuration key or MCP tool name for this proposal. Do not turn the design into invocation instructions before implementation, review and owner approval.
 
 Prepared future policy text, conditional on that work:
 
