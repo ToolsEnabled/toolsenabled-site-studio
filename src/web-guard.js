@@ -2,7 +2,7 @@
 'use strict';
 /** PreToolUse boundary that preserves normal host permission prompts. */
 const MAX_HOOK_BYTES = 1024 * 1024;
-const ALLOW = new Set(require('./tools-definitions').TOOLS.flatMap(({name})=>['mcp__site-studio__'+name,'mcp__site_studio__'+name]));
+const ALLOW = new Set(require('./tools-definitions').TOOLS.flatMap(({name})=>['mcp__site-studio__'+name,'mcp__site_studio__'+name,'mcp__plugin_toolsenabled-site-studio_site-studio__'+name]));
 const REASONS = {
   Bash: 'WEB_GUARD_SHELL_REFUSED: shell access would bypass pause, revision, and history checks.',
   PowerShell: 'WEB_GUARD_SHELL_REFUSED: shell access would bypass pause, revision, and history checks.',

@@ -13,7 +13,7 @@ test('Claude folder options launch literal paths and preserve Codex sample defau
   assert.equal(manifest.version, read('package.json').version);
   assert.equal(manifest.name, 'toolsenabled-site-studio');
   const codex = read('.codex-plugin/plugin.json');
-  assert.deepEqual(codex.mcpServers, {'site-studio':{command:'node',args:['./mcp-web.js'],cwd:'./',env_vars:['SITE_STUDIO_ROOT','SITE_STUDIO_DATA']}});
+  assert.deepEqual(codex.mcpServers, {'site-studio':{command:'node',args:['./mcp-web.js'],cwd:'./',env_vars:['SITE_STUDIO_ROOT','SITE_STUDIO_DATA','SystemRoot']}});
   assert.deepEqual(Object.keys(read('.mcp.json').mcpServers),Object.keys(codex.mcpServers));
   const o = fixture(t);
   const options = {site_directory: path.join(o.root, 'site space $(literal)'), data_directory: path.join(o.root, 'state space'), export_directory: path.join(o.root, 'export space')};
@@ -21,7 +21,7 @@ test('Claude folder options launch literal paths and preserve Codex sample defau
   const before = fs.readFileSync(path.join(options.site_directory, 'index.html'));
   const config = read('.mcp.json').mcpServers['site-studio'];
   assert.equal(config.command, 'node');
-  assert.deepEqual(config.env,{SITE_STUDIO_ROOT:'${user_config.site_directory}',SITE_STUDIO_DATA:'${user_config.data_directory}'});
+  assert.deepEqual(config.env,{SITE_STUDIO_ROOT:'${user_config.site_directory}',SITE_STUDIO_DATA:'${user_config.data_directory}',SystemRoot:'${SystemRoot:-}'});
   for (const key of Object.keys(options)) assert.deepEqual([manifest.userConfig[key].type, manifest.userConfig[key].required], ['directory', true]);
   const args = config.args.map(arg => {
     let value = arg.replace('${CLAUDE_PLUGIN_ROOT}', root);

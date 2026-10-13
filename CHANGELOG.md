@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.1.3 — Unreleased
+
+- Add Claude Code panes for working-copy status, pages and source, search, changes, references, history, checkpoints, startup diagnostics and human dashboard/export guidance, with bounded local reads, snapshot paging and terminal sanitization.
+- Add explicit edit, new-page, checkpoint and SVG action commands using ordinary model and tool permissions; document exact command names and Codex CLI/skill equivalents.
+- Diagnose missing or non-empty state folders and missing source/export parents without creating or repairing anything.
+- Record UTC times for new activity and show unavailable times honestly for older history.
+- Forward Windows SystemRoot explicitly to MCP servers and document the clear refusal when it is absent.
+- Refresh test-report facts and document the separate hook, native command-resolution and real-terminal qualification gates.
+- Start the pane reader through an emptied environment holding only PATH, so client credentials and other variables are not inherited.
+- Keep every advertised pane key (n, p, r, b, 1–8, q) claimed in every pane state with a short hint where it does not apply, open the pane as a dialog, and list only the keys that apply.
+- Show where a change starts (line and column) when it lies deep inside a long line, and say when the change is in hidden characters or beyond the first 64 KiB.
+- Find the server's default state folder from Codex views when SITE_STUDIO_ROOT ends with a path separator.
+- Show the same required arguments in the help pane's Codex column as in the Claude command (page, find, changes and pages --assets).
+- Declare Linux as the only manifest platform and label the remaining Windows runtime and test instructions as not yet supported.
+
 ## 0.1.2 — 2026-10-02
 
 - Add a reproducible unsigned Desktop bundle builder and manifest; keep release-time Registry metadata outside plugin artifacts and document development-signature, verifier and native-platform limits.

@@ -119,4 +119,20 @@ function acquireLease(directory) {
     try{fs.unlinkSync(temporary);}catch(e){if(e.code!=='ENOENT')throw e;}
   }
 }
-module.exports={acquireLease,processIdentity};
+// Observation only: never publish a claim, recover an owner, or sweep metadata.
+function inspectLease(directory) {
+  let owner;
+  try {
+    const file=require('./web-import').checkedPath(path.join(directory,'lease.json'));
+    owner=readLease(file).value;
+    const scope=identityScope();
+    const scopeMatches=!!owner.scope&&owner.scope.kind===scope.kind&&owner.scope.hostname===scope.hostname
+      &&owner.scope.pidNamespace===scope.pidNamespace;
+    if(!scopeMatches)return {status:'unverifiable',pid:owner.pid,scopeMatches:false};
+    return {status:ownerAlive(owner,scope,file)?'live':'dead',pid:owner.pid,scopeMatches:true};
+  } catch(e) {
+    if(e.code==='ENOENT')return {status:'absent',pid:null,scopeMatches:null};
+    return {status:'unverifiable',pid:owner?.pid??null,scopeMatches:null};
+  }
+}
+module.exports={acquireLease,processIdentity,inspectLease};

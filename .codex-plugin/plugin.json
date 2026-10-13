@@ -1,6 +1,6 @@
 {
   "name": "site-studio",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Build and edit static sites in an isolated working copy, with live preview and human-controlled export.",
   "author": {
     "name": "ToolsEnabled"
@@ -28,8 +28,10 @@
       "cwd": "./",
       "env_vars": [
         "SITE_STUDIO_ROOT",
-        "SITE_STUDIO_DATA"
+        "SITE_STUDIO_DATA",
+        "SystemRoot"
       ]
     }
-  }
+  },
+  "skills": "./skills/"
 }

@@ -21,7 +21,7 @@ Tool results have one text content block containing JSON. Refusals set `isError:
 | `web_add_page` | `path`, `title`, `expected_rev` | none | Create a new relative `.html` page, including parent directories. Existing paths refuse. |
 | `web_draw` | `path`, `svg`, `expected_rev` | none | Create a new relative `.svg` asset after strict SVG validation. No script, animation or foreignObject. |
 | `web_screenshot_note` | none | none | Revision, file count and an explicit notice that no pixels were captured. |
-| `web_timeline` | none | `limit` (1–100, default 50) | Recent timeline metadata and named checkpoints. It cannot restore history. |
+| `web_timeline` | none | `limit` (1–100, default 50) | Recent timeline metadata and named checkpoints. New entries include UTC `at`; older entries may omit it. It cannot restore history. |
 | `web_checkpoint` | `label`, `expected_rev` | none | Save the current working model under a unique label (1–80 characters, maximum 10 named checkpoints; no control/bidi characters or system summaries). Human restores/deletes it. |
 | `web_preview` | none | none | `url` is the human dashboard; `site_url` identifies the independent preview origin; its files require the HttpOnly read cookie issued through the authenticated dashboard; both bind only to 127.0.0.1. |
 

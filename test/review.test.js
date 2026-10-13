@@ -101,7 +101,7 @@ test('history distinguishes actors and protects the opened r0 restore target',as
  const {fixture,textOp}=require('./helpers');const {createStore}=require('../src/studio-store');const o=fixture(t);let app=createStore(o);t.after(()=>app.close());
  for(const label of ['Undid last edit','Original site (revision 0)','Opened working copy (r0)','x\u202Ey','x\nnext'])assert.throws(()=>app.checkpoint(label,0),/label/);
  const initial=app.status.checkpoints.find(c=>c.permanent);assert.equal(initial.label,'Opened working copy (r0)');assert.equal(initial.actor,'system');
- app.edit(textOp(app.model));app.checkpoint('Agent note',1);assert.deepEqual({...app.status.history.at(-1)},{rev:1,actor:'agent',type:'checkpoint',summary:'Saved checkpoint',label:'Agent note'});
+ app.edit(textOp(app.model));app.checkpoint('Agent note',1);const {at,...entry}=app.status.history.at(-1);assert.equal(new Date(at).toISOString(),at);assert.equal(typeof at,'string');assert.deepEqual(entry,{rev:1,actor:'agent',type:'checkpoint',summary:'Saved checkpoint',label:'Agent note'});
  app.human('checkpoint',{expectedRev:1,label:'Human review'});assert.equal(app.status.history.at(-1).actor,'human');assert.equal(app.status.checkpoints.find(c=>c.label==='Human review').actor,'human');
  assert.throws(()=>app.human('delete_checkpoint',{expectedRev:1,label:initial.label}),/permanent/);
  for(let i=0;i<23;i++)app.edit(textOp(app.model,'Edit '+i));app.close();app=createStore(o);app.human('restore',{expectedRev:24,label:initial.label});assert.match(app.model.files.find(f=>f.path==='index.html').source,/>Home</);assert.equal(app.model.rev,25);assert.equal(app.status.history.at(-1).actor,'human');assert.equal(app.status.history.at(-1).summary,'Restored checkpoint');

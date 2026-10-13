@@ -69,4 +69,27 @@ function exportSite({sourceRoot,dataRoot,exportRoot,originalFingerprint,model,on
     fs.unlinkSync(lock);
   }
 }
-module.exports = {exportSite};
+// Advisory observation. The confirmed export repeats its checks under its own lock.
+// No lock is created/read/removed; a present lock's owner cannot be authenticated
+// from its legacy PID-only record, so a stale/live assertion would be misleading.
+function exportPreflight({sourceRoot,dataRoot,exportRoot,originalFingerprint}) {
+  const out={configured:!!exportRoot,pathsSafe:false,parentExists:false,destinationExists:false,lockPresent:null,originalDrift:null,ready:false};
+  if(!exportRoot)return out;
+  try {
+    const {absolutePath}=require('./options');
+    sourceRoot=checkedPath(absolutePath(sourceRoot,'site'));dataRoot=checkedPath(absolutePath(dataRoot,'state'));
+    exportRoot=checkedPath(absolutePath(exportRoot,'export'),{missing:true});
+    const install=path.resolve(__dirname,'..');
+    if(within(exportRoot,install)||within(exportRoot,dataRoot)||within(dataRoot,exportRoot)
+      ||exportRoot!==sourceRoot&&(within(exportRoot,sourceRoot)||within(sourceRoot,exportRoot)))return out;
+    out.pathsSafe=true;const parent=checkedPath(path.dirname(exportRoot));
+    out.parentExists=fs.statSync(parent).isDirectory();out.destinationExists=fs.existsSync(exportRoot);
+    out.replacesOriginal=exportRoot===sourceRoot;
+    const lock=path.join(parent,'.site-studio-export-'+hash(exportRoot).slice(7,31)+'.lock');
+    try{fs.lstatSync(lock);out.lockPresent=true;}catch(e){if(e.code!=='ENOENT')throw e;out.lockPresent=false;}
+    out.originalDrift=fingerprint(importSite(sourceRoot))!==originalFingerprint;
+    out.ready=out.parentExists&&!out.lockPresent&&!out.originalDrift&&(!out.destinationExists||out.replacesOriginal);
+  } catch { /* Unknown remains explicit. Never reflect a path-bearing I/O error. */ }
+  return out;
+}
+module.exports = {exportSite,exportPreflight};

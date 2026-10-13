@@ -33,6 +33,8 @@ test('all read tools, text and node pagination, and narrow result limits', async
 test('guard denies all direct writes, shell, network, model tools and malformed input', () => {
   const {TOOLS} = require('../src/tools-definitions'); const {decide} = require('../web-guard');
   for (const {name} of TOOLS) assert.equal(decide({tool_name:'mcp__site-studio__'+name})[0],null);
+  for (const {name} of TOOLS) assert.equal(decide({tool_name:'mcp__plugin_toolsenabled-site-studio_site-studio__'+name})[0],null);
+  for(const name of ['mcp__plugin_toolsenabled-site-studio_site-studio__web_export','mcp__plugin_other_site-studio__web_read','mcp__plugin_toolsenabled-site-studio_other__web_read'])assert.equal(decide({tool_name:name})[0],'deny');
   for (const name of ['Read','Write','Edit','Bash','PowerShell','WebFetch','WebSearch','mcp__design__design_image_generate','mcp__site-studio__web_export','unknown']) assert.equal(decide({tool_name:name})[0],'deny');
   for (const input of [null,[],{},'Write']) assert.equal(decide(input)[0],'deny');
   for(const {name} of TOOLS){const r=spawnSync(process.execPath,[path.join(__dirname,'../web-guard.js')],{input:JSON.stringify({tool_name:'mcp__site-studio__'+name}),encoding:'utf8',timeout:3000});assert.equal(r.status,0);assert.equal(r.stdout,'');}

@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "toolsenabled-site-studio",
   "display_name": "ToolsEnabled Site Studio",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Local static website editing with a private working copy and human-controlled export.",
   "author": {
     "name": "ToolsEnabled, Inc.",
@@ -36,7 +36,8 @@
       ],
       "env": {
         "SITE_STUDIO_ROOT": "${user_config.site_directory}",
-        "SITE_STUDIO_DATA": "${user_config.data_directory}"
+        "SITE_STUDIO_DATA": "${user_config.data_directory}",
+        "SystemRoot": "${SystemRoot:-}"
       }
     }
   },
@@ -56,14 +57,13 @@
     "export_directory": {
       "type": "directory",
       "title": "Human export destination",
-      "description": "Absolute path to a new destination folder whose parent exists, outside the site and state folders. Only the human dashboard can confirm export. Keep it outside the plugin installation.",
+      "description": "Absolute path to a new destination folder, or the original site folder, whose parent exists. Keep it separate from state and outside the plugin installation. The human dashboard requires explicit export confirmation.",
       "required": true
     }
   },
   "compatibility": {
     "platforms": [
-      "darwin",
-      "win32"
+      "linux"
     ],
     "runtimes": {
       "node": ">=22"
