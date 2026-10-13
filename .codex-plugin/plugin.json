@@ -14,12 +14,15 @@
     "displayName": "ToolsEnabled Site Studio",
     "shortDescription": "Local static website editing",
     "longDescription": "Connect an MCP host to a private working copy. Preview edits locally, checkpoint progress, and let the human undo or export.",
-    "developerName": "ToolsEnabled",
+    "developerName": "ToolsEnabled, Inc.",
     "category": "Productivity",
     "capabilities": [
       "Interactive",
       "Write"
     ],
+    "websiteURL": "https://toolsenabled.ai/site-studio/",
+    "supportURL": "https://toolsenabled.ai/support/",
+    "privacyPolicyURL": "https://toolsenabled.ai/privacy/",
     "defaultPrompt": [
       "Improve the sample site and show me a preview."
     ]
@@ -38,5 +41,6 @@
       ]
     }
   },
-  "skills": "./skills/"
+  "skills": "./skills/",
+  "hooks": {}
 }
