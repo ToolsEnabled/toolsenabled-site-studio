@@ -6,7 +6,7 @@ Site Studio runs locally with Node 22 or newer. Claude Code 2.1.284 and 2.1.287 
 
 ## Claude Code
 
-Version 0.1.4 is distributed as a GitHub release archive and through the repository's own plugin marketplace (see [Load the local plugin for Claude Code commands](#load-the-local-plugin-for-claude-code-commands)); public plugin directories are not used. Download `toolsenabled-site-studio-0.1.4.zip` and its `.sha256` file from the published release, verify with `sha256sum -c toolsenabled-site-studio-0.1.4.zip.sha256` (the release notes print the same hash), and extract it outside the site and private state folders; it extracts to `site-studio/`. Use direct MCP registration below for tool-only clients, or load the extracted local plugin for slash commands. Neither route requires a marketplace listing.
+Version 0.1.5 is distributed as a GitHub release archive and through the repository's own plugin marketplace (see [Load the local plugin for Claude Code commands](#load-the-local-plugin-for-claude-code-commands)); installing from that marketplace does not depend on any public plugin directory. Download `toolsenabled-site-studio-0.1.5.zip` and its `.sha256` file from the published release, verify with `sha256sum -c toolsenabled-site-studio-0.1.5.zip.sha256` (the release notes print the same hash), and extract it outside the site and private state folders; it extracts to `site-studio/`. Use direct MCP registration below for tool-only clients, or load the extracted local plugin for slash commands. Neither route requires a marketplace listing.
 
 Open a terminal in the site's project directory, then register the extracted server for that project only:
 

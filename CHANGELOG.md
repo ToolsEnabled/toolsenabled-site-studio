@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.5 — 2026-10-13
+
+- Declare MCP annotations on every tool: a short title, `readOnlyHint` and `destructiveHint`, `idempotentHint` for the nine tools that change the working copy or its checkpoints, and `openWorldHint` (false for every tool). Seven tools only read; the nine that change things are marked destructive. Tool names, inputs and behavior are unchanged, and a test pins every value.
+- Add the README section "What this plugin runs, sends and reads": the MCP server's command and what it reads, writes and sends; what each `/site-studio` pane hook does; the one program the pane starts, with its full command; what that program reads; the commands and skill; the tests the plugin directory flags; and the one maintainer script that uses the network.
+- Add the plugin directory's listing icon to the repository. It is not part of the release archive.
+- Set the plugin directory's listing links in the Claude plugin manifest (documentation, privacy policy and support pages), use the product page https://toolsenabled.ai/site-studio/ as the homepage in the Claude, Codex and Desktop manifests, and link the privacy policy at https://toolsenabled.ai/privacy/.
+- Say that installing from the repository's own marketplace does not depend on any public plugin directory, instead of saying that public plugin directories are not used (README and install guide).
+- Describe agent export in the README and `docs/EXPORT-GATE.md` as a proposed design that is not implemented, without internal decision wording.
+- Tests: the browser, MCP server and timed Node processes that the tests start get only `PATH`, the temporary-folder variables, `SystemRoot` on Windows and, for the browser, `HOME`, and the test files the plugin directory flagged read no environment variables. The package test also checks the `.claude-plugin` folder and still passes in an extracted archive.
+
 ## 0.1.4 — 2026-10-13
 
 - Refuse startup when the `--export-dir` parent folder does not exist, before any state is created; an existing destination is still checked when the human confirms export, so a server can restart after exporting.
