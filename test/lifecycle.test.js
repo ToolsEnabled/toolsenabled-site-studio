@@ -1,5 +1,5 @@
 'use strict';
-const test=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const path=require('node:path');const {fixture,childEnv,evidenceDir}=require('./helpers');const {start}=require('./mcp-helper');
+const test=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const path=require('node:path');const {fixture,saveEvidence}=require('./helpers');const {start,runOnce}=require('./mcp-helper');
 test('stdio golden tools/list and two-page edit checkpoint undo export lifecycle',async t=>{
   const o=fixture(t),original=fs.readFileSync(path.join(o.sourceRoot,'index.html')),child=start(o);t.after(()=>child.stop());
   const initialized=await child.init();assert.equal(initialized.result.serverInfo.name,'toolsenabled-site-studio');assert.equal(initialized.result.serverInfo.version,'0.1.4');assert.equal(require('../package.json').version,'0.1.4');assert.equal(require('../.codex-plugin/plugin.json').version,'0.1.4');
@@ -22,7 +22,7 @@ test('stdio golden tools/list and two-page edit checkpoint undo export lifecycle
   await human('restore',{expectedRev:7,label:'Designed'});assert.equal((await child.tool('web_pages')).rev,8);
   assert.deepEqual(await child.stop(),{code:0,signal:null});assert.equal(fs.existsSync(path.join(o.dataRoot,'lease.json')),false);for(const url of [preview.url,preview.site_url]){const probe=require('node:net').createServer();await new Promise((resolve,reject)=>{probe.once('error',reject);probe.listen(Number(new URL(url).port),'127.0.0.1',resolve);});await new Promise(resolve=>probe.close(resolve));}
   const next=start(o);t.after(()=>next.stop());await next.init();assert.equal((await next.tool('web_pages')).rev,8);assert.deepEqual(await next.stop(),{code:0,signal:null});
-  const evidence=evidenceDir();if(evidence){const dir=path.join(evidence,'lifecycle');fs.mkdirSync(dir,{recursive:true});fs.cpSync(o.sourceRoot,path.join(dir,'original'),{recursive:true});fs.cpSync(o.exportRoot,path.join(dir,'export'),{recursive:true});const crypto=require('node:crypto');const hashes={};for(const rel of ['index.html','styles.css','nested/about.html','nested/pixel.png','art/mark.svg'])hashes[rel]=crypto.createHash('sha256').update(fs.readFileSync(path.join(o.exportRoot,rel))).digest('hex');fs.writeFileSync(path.join(dir,'receipt.json'),JSON.stringify({ok:true,tools:list.result.tools.length,pages:2,edits:['text','attribute','CSS','section','SVG'],checkpoint:'Designed',exportRevision:7,restoredAndRestartedRevision:8,originalUnchanged:true,binaryPreserved:true,exitCode:0,leaseReleased:true,bothPortsRebound:true,dashboardSessionRequired:true,sha256:hashes},null,2)+'\n');fs.writeFileSync(path.join(dir,'mcp-responses.json'),JSON.stringify(child.output,null,2)+'\n');}
+  await saveEvidence(e=>{e.copy('lifecycle/original',o.sourceRoot);e.copy('lifecycle/export',o.exportRoot);const crypto=require('node:crypto');const hashes={};for(const rel of ['index.html','styles.css','nested/about.html','nested/pixel.png','art/mark.svg'])hashes[rel]=crypto.createHash('sha256').update(fs.readFileSync(path.join(o.exportRoot,rel))).digest('hex');e.write('lifecycle/receipt.json',JSON.stringify({ok:true,tools:list.result.tools.length,pages:2,edits:['text','attribute','CSS','section','SVG'],checkpoint:'Designed',exportRevision:7,restoredAndRestartedRevision:8,originalUnchanged:true,binaryPreserved:true,exitCode:0,leaseReleased:true,bothPortsRebound:true,dashboardSessionRequired:true,sha256:hashes},null,2)+'\n');e.write('lifecycle/mcp-responses.json',JSON.stringify(child.output,null,2)+'\n');});
 
 });
 test('stdio validates protocol and tool arguments, refuses stale edits and settles EOF',async t=>{
@@ -42,8 +42,7 @@ test('a killed MCP owner is recovered automatically with its saved state',async 
  const o=fixture(t),first=start(o);await first.init();await first.tool('web_checkpoint',{label:'Before crash',expected_rev:0});
  const file=path.join(o.dataRoot,'lease.json'),lease=JSON.parse(fs.readFileSync(file));
  first.child.kill('SIGKILL');await first.exited;
- const {spawnSync}=require('node:child_process');
- const run=spawnSync(process.execPath,[path.join(__dirname,'../mcp-web.js'),'--site',o.sourceRoot,'--data-dir',o.dataRoot],{input:JSON.stringify({jsonrpc:'2.0',id:1,method:'initialize',params:{protocolVersion:'2025-06-18',capabilities:{},clientInfo:{name:'recovery-test',version:'1'}}})+'\n',encoding:'utf8',timeout:5000,env:childEnv()});
+ const run=runOnce(o,JSON.stringify({jsonrpc:'2.0',id:1,method:'initialize',params:{protocolVersion:'2025-06-18',capabilities:{},clientInfo:{name:'recovery-test',version:'1'}}})+'\n');
  assert.equal(run.status,0,run.stderr);assert.match(run.stderr,/Recovered stale Site Studio state lease/);
  assert.equal(typeof lease.process.startTime,'string');assert(lease.process.startTime);assert.equal(lease.pid,first.child.pid);
  assert(JSON.parse(fs.readFileSync(path.join(o.dataRoot,'state.json'))).checkpoints.some(c=>c.label==='Before crash'));

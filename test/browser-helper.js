@@ -1,9 +1,9 @@
 'use strict';
 const {spawn}=require('node:child_process');const fs=require('node:fs');const path=require('node:path');const os=require('node:os');const {childEnv}=require('./helpers');
-// settings holds SITE_STUDIO_CHROME and SITE_STUDIO_CHROME_NO_SANDBOX; it defaults to the runner's environment.
+// settings holds SITE_STUDIO_CHROME and SITE_STUDIO_CHROME_NO_SANDBOX; by default both are read from the runner's environment.
 // The browser process gets only childEnv('HOME'), not the rest of that environment. Without HOME it would
 // keep its per-user files (crash-report settings, certificate store) in the temporary folder instead.
-async function browser(settings=process.env) {
+async function browser(settings={SITE_STUDIO_CHROME:process.env.SITE_STUDIO_CHROME,SITE_STUDIO_CHROME_NO_SANDBOX:process.env.SITE_STUDIO_CHROME_NO_SANDBOX}) {
   const binary=settings.SITE_STUDIO_CHROME;if(!binary)throw Error('Browser tests require SITE_STUDIO_CHROME set to a Chrome/Chromium executable; see docs/TESTING.md.');
   const profile=fs.mkdtempSync(path.join(os.tmpdir(),'site-studio-browser-'));const flags=['--headless','--remote-debugging-pipe','--no-first-run','--no-default-browser-check','--disable-background-networking','--disable-component-update','--disable-sync','--disable-extensions','--disable-features=OptimizationHints,MediaRouter','--metrics-recording-only','--password-store=basic','--use-mock-keychain','--disable-dev-shm-usage','--window-size=1440,960','--user-data-dir='+profile];if(settings.SITE_STUDIO_CHROME_NO_SANDBOX==='1')flags.push('--no-sandbox','--no-zygote');
   const child=spawn(binary,flags,{env:childEnv('HOME'),stdio:['ignore','ignore','pipe','pipe','pipe']});let buffer='',id=0,sessionId;const pending=new Map(),listeners=new Map(),eventWork=new Set(),eventErrors=[],loaded=new Set();let stderr='';child.stdio[3].on('error',e=>{for(const p of pending.values()){clearTimeout(p.timer);p.reject(e);}});child.stderr.on('data',b=>stderr+=b);const exited=new Promise(resolve=>child.once('close',resolve));child.on('error',e=>{for(const p of pending.values())p.reject(e);});

@@ -26,6 +26,12 @@ function childEnv(...more) {
   for (const name of [...CHILD_ENV, ...more]) if (process.env[name] !== undefined) env[name] = process.env[name];
   return env;
 }
-// Optional folder for evidence files such as screenshots (docs/TESTING.md); undefined when unset.
-function evidenceDir() { return process.env.SITE_STUDIO_EVIDENCE_DIR || undefined; }
-module.exports={fixture,textOp,childEnv,evidenceDir};
+// Evidence files (docs/TESTING.md) are saved only when SITE_STUDIO_EVIDENCE_DIR names a folder. The callback gets
+// write(relative path, data) and copy(relative path, source folder); tests never see the folder's path.
+async function saveEvidence(save) {
+  const root = process.env.SITE_STUDIO_EVIDENCE_DIR;
+  if (!root) return;
+  const target = rel => { const file = path.join(root, rel); fs.mkdirSync(path.dirname(file), {recursive:true}); return file; };
+  await save({write:(rel, data) => fs.writeFileSync(target(rel), data), copy:(rel, from) => fs.cpSync(from, target(rel), {recursive:true})});
+}
+module.exports={fixture,textOp,childEnv,saveEvidence};
