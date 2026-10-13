@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "toolsenabled-site-studio",
   "display_name": "ToolsEnabled Site Studio",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Local static website editing with a private working copy and human-controlled export.",
   "author": {
     "name": "ToolsEnabled, Inc.",

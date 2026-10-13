@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.7 — 2026-10-13
+
+Fixes the five findings of a code review of 0.1.6:
+
+- Links written without quotes and ending in `/`, such as `<a href=/blog/>` in minified site output, are read the way browsers read them. Before, Site Studio took that last `/` as the end of the tag: setting an attribute on such a link changed its target (`/blog/` became `/blog`), removing the element left its closing `</a>` behind, and setting its text failed with "node is not paired". Tags that really end in `/`, such as `<br/>` or `<img src="a.png"/>`, are read as before.
+- On a large site the newest undo state is no longer dropped. Every undo state is a full copy of the site, and with 24 MiB or more of files a single edit used to leave the dashboard with no Undo and no warning. Older undo and redo states are still dropped first to keep the saved state near 96 MiB; the newest undo and the newest redo state are dropped only when the saved state would otherwise exceed its 128 MiB limit, and then the result of that edit or action, and the dashboard, say so (`undoPruned`).
+- An SVG drawing made with `web_draw` displays as an image file even when its source leaves out the SVG namespace: `xmlns="http://www.w3.org/2000/svg"`, and `xmlns:xlink` when `xlink:href` is used, are added to the root when missing. Before, such a file was accepted and then showed as a broken image in the preview and in the exported site.
+- A checkpoint can no longer be named `original` (in any letter case), because `changes original` means the opened working copy; before, a checkpoint with that name could not be chosen in the changes view. A saved checkpoint that already has the name is shown as "Imported checkpoint".
+- If the very first start in a new state folder was killed before it saved its state (for example by a power loss), the next start no longer refuses the folder as "not empty". It removes the half-written working copy and temporary state file, with a one-line notice, but only when they hold nothing but a copy of the site; anything else is refused and kept as before. `doctor` names such leftovers instead of reporting a non-empty folder.
+
 ## 0.1.6 — 2026-10-13
 
 - The test runner (`node tools/run-tests.js`) checks `TMPDIR` before it starts any test and stops with a message that names the problem: `TMPDIR` must be the absolute real path of an existing folder, not one reached through a symbolic link, and at most 62 bytes long. Before, a longer `TMPDIR` made Chrome exit because its lock socket path did not fit the Unix limit, and the fifteen browser tests failed with a bare `read ECONNRESET`; a relative or linked `TMPDIR` made the working-copy store refuse its copy with `symbolic link refused` (a deliberate guard) in many tests. The browser helper repeats the length check when a browser test file is run on its own.
