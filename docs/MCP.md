@@ -19,10 +19,10 @@ Tool results have one text content block containing JSON. Refusals set `isError:
 | `web_move` | `file_id`, `node_id`, `parent_id`, `position`, `expected_rev` | none | Move a safe node within its HTML file. Cannot move into itself/descendants or executable contexts. |
 | `web_remove` | `file_id`, `node_id`, `expected_rev` | none | Remove an HTML node from the working copy. Undo remains human-controlled. |
 | `web_add_page` | `path`, `title`, `expected_rev` | none | Create a new relative `.html` page, including parent directories. Existing paths refuse. |
-| `web_draw` | `path`, `svg`, `expected_rev` | none | Create a new relative `.svg` asset after strict SVG validation. No script, animation or foreignObject. |
+| `web_draw` | `path`, `svg`, `expected_rev` | none | Create a new relative `.svg` asset after strict SVG validation. No script, animation or foreignObject. Missing `xmlns` (and `xmlns:xlink` when `xlink:href` is used) are added to the root so the file displays as a standalone image. |
 | `web_screenshot_note` | none | none | Revision, file count and an explicit notice that no pixels were captured. |
 | `web_timeline` | none | `limit` (1–100, default 50) | Recent timeline metadata and named checkpoints. New entries include UTC `at`; older entries may omit it. It cannot restore history. |
-| `web_checkpoint` | `label`, `expected_rev` | none | Save the current working model under a unique label (1–80 characters, maximum 10 named checkpoints; no control/bidi characters or system summaries). Human restores/deletes it. |
+| `web_checkpoint` | `label`, `expected_rev` | none | Save the current working model under a unique label (1–80 characters, maximum 10 named checkpoints; no control/bidi characters, system summaries or the single word `original`). Human restores/deletes it. |
 | `web_preview` | none | none | `url` is the human dashboard; `site_url` identifies the independent preview origin; its files require the HttpOnly read cookie issued through the authenticated dashboard; both bind only to 127.0.0.1. |
 
 A successful mutation returns `{ "rev": 1 }`; the number varies with state. A checkpoint also returns its label. `web_preview` does not open a browser automatically.

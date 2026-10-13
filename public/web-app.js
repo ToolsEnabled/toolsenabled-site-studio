@@ -25,7 +25,7 @@ async function refresh() {
     $('redo').disabled = !state.redo;
     $('export').disabled = !state.exportConfigured;
     $('destination').textContent = state.exportConfigured ? 'Export to: ' + state.exportDestination : 'Set an export destination at startup to save a finished copy.';
-    if (state.durabilityWarning) message(state.durabilityWarning);
+    if (state.durabilityWarning || state.undoPruned) message([state.durabilityWarning, state.undoPruned].filter(Boolean).join(' '));
 
     const active = $('page').value;
     $('page').replaceChildren();

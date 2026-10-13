@@ -75,6 +75,22 @@ function attribute(name,value,{svg=false,allowExternal=false}={}) {
   if(name==='target'&&value!=='_self') throw Error('only same-frame navigation allowed');
   return [camel[name]||name,value];
 }
+// In HTML a "/" before ">" marks a self-closing tag only outside an unquoted attribute value: <a href=/blog/> has the
+// value "/blog/" and is an ordinary opening tag. This follows the HTML tokenizer's attribute states from the end of the
+// tag name to the slash; true means the slash belongs to an unquoted value (or starts one, as in href=/).
+function slashInUnquotedValue(source,from,slash){
+  let state='between',quote='';
+  for(let k=from;k<slash;k++){
+    const c=source[k];
+    if(state==='quoted'){if(c===quote)state='between';}
+    else if(state==='unquoted'){if(RX.space.test(c))state='between';}
+    else if(state==='value'){if(c==='"'||c==="'"){quote=c;state='quoted';}else if(!RX.space.test(c))state='unquoted';}
+    else if(c==='='&&state!=='between')state='value';
+    else if(RX.space.test(c)){if(state==='name')state='afterName';}
+    else state=c==='/'?'between':'name';
+  }
+  return state==='value'||state==='unquoted';
+}
 // Opening-tag attributes are quote-aware; comments, bogus declarations and end tags
 // use their browser boundaries. Foreign content must not hide HTML tokens as RAW text.
 function tokenize(source,{xml=false,maxTokens=Infinity}={}) {
@@ -119,7 +135,7 @@ function tokenize(source,{xml=false,maxTokens=Infinity}={}) {
     }
     if(j===source.length)throw Error('unterminated tag');
     let tail=j;while(tail>head&&RX.space.test(source[tail-1]))tail--;
-    const self=source[tail-1]==='/';
+    const self=source[tail-1]==='/'&&(closing||xml||!slashInUnquotedValue(source,head,tail-1));
     const t={tag:source.slice(begin,head).toLowerCase(),originalTag:source.slice(begin,head),closing,self,attrs:source.slice(head,self?tail-1:j),start:i,end:j+1};out.push(t);i=j+1;
     if(t.tag==='svg')svgDepth=closing?Math.max(0,svgDepth-1):svgDepth+(self?0:1);
     if(t.tag==='math')mathDepth=closing?Math.max(0,mathDepth-1):mathDepth+(self?0:1);
@@ -161,16 +177,24 @@ function parseAttrs(raw,{preserveCase=false,decodeValue=decodeAttribute}={}) {
 function fragment(source,{svg=false,section=false,allowExternal=false}={}) {
   if(typeof source!=='string'||source.length>65536) throw Error('invalid fragment');
   const stack=[]; let roots=0,rootTag=''; let result='';
+  // A standalone SVG file needs the SVG namespace on its root, and xmlns:xlink wherever xlink: attributes are used;
+  // without them it shows as a broken image. Missing declarations are added to the root.
+  let rootEnd=0,rootNames=new Set(),xlink=false;
   for(const t of tokenize(source)) {
     if(t.comment||t.declaration) throw Error('declarations and comments not allowed');
     if(t.text!==undefined) {if(!stack.length&&t.text.trim()) throw Error('text outside root'); result+=escapeText(decode(t.text));continue;}
     const allowed=svg?SVG:HTML; if(!allowed.has(t.tag)) throw Error('element not allowed: '+t.tag);
     if(t.closing){if(t.attrs.trim()||stack.pop()!==t.tag) throw Error('unbalanced fragment'); result+='</'+(camel[t.tag]||t.tag)+'>';continue;}
-    if(!stack.length){roots++;rootTag=t.tag;}
-    result+='<'+(camel[t.tag]||t.tag);
-    for(const [k,v] of parseAttrs(t.attrs)){const [name,val]=attribute(k,v,{svg,allowExternal}); result+=' '+name+'="'+escapeAttr(val)+'"';}
+    const root=!stack.length;if(root){roots++;rootTag=t.tag;}
+    result+='<'+(camel[t.tag]||t.tag);if(root)rootEnd=result.length;
+    for(const [k,v] of parseAttrs(t.attrs)){const [name,val]=attribute(k,v,{svg,allowExternal}); result+=' '+name+'="'+escapeAttr(val)+'"';if(root)rootNames.add(name);if(name.startsWith('xlink:'))xlink=true;}
     if(svg&&t.self)result+='/>'; else {result+='>'; if(!VOID.has(t.tag)){if(t.self)throw Error('HTML self-closing nonvoid element'); stack.push(t.tag);}}
   }
-  if(stack.length||roots!==1||svg&&rootTag!=='svg'||section&&rootTag!=='section') throw Error('invalid fragment root'); return result;
+  if(stack.length||roots!==1||svg&&rootTag!=='svg'||section&&rootTag!=='section') throw Error('invalid fragment root');
+  if(svg){
+    const missing=(rootNames.has('xmlns')?'':' xmlns="http://www.w3.org/2000/svg"')+(xlink&&!rootNames.has('xmlns:xlink')?' xmlns:xlink="http://www.w3.org/1999/xlink"':'');
+    result=result.slice(0,rootEnd)+missing+result.slice(rootEnd);
+  }
+  return result;
 }
 module.exports={HTML,SVG,VOID,RAW,escapeText,escapeAttr,decode,decodeAttribute,safeUrl,css,attribute,tokenize,parseAttrs,fragment};

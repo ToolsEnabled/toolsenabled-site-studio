@@ -78,6 +78,7 @@
   "test/regressions.test.js",
   "test/release-tools.test.js",
   "test/release-worker.py",
+  "test/review-findings.test.js",
   "test/review.test.js",
   "test/security-store.test.js",
   "test/session-helper.js",

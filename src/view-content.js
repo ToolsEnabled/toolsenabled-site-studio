@@ -73,10 +73,12 @@ function unopenedDoctor({sourceRoot,dataRoot,exportRoot,unopened=true}){
    else if(process.platform!=='win32'&&(stat.mode&0o077))rows.push('State folder: private permissions required (0700).');
    else if(!unopened){stateSafe=true;rows.push('State folder: private directory; saved contents not inspected.');}
    else{
-    stateSafe=true;let other=0,metadata=0,seen=0,entry;const dir=fs.opendirSync(dataRoot);
-    try{while((entry=dir.readSync())!==null&&seen++<1000){if(entry.name==='lease.json'||RX.leaseMetadata.test(entry.name))metadata++;else other++;}}
+    stateSafe=true;let other=0,metadata=0,leftovers=0,seen=0,entry;const dir=fs.opendirSync(dataRoot);
+    try{while((entry=dir.readSync())!==null&&seen++<1000){if(entry.name==='lease.json'||RX.leaseMetadata.test(entry.name))metadata++;else if(RX.generation.test(entry.name)&&entry.isDirectory()||RX.stateTemp.test(entry.name)&&entry.isFile())leftovers++;else other++;}}
     finally{dir.closeSync();}
-    rows.push(other||entry?'Startup blocked: state folder is non-empty; use a dedicated empty folder.':'State folder: dedicated empty folder, apart from permitted lease metadata.');
+    rows.push(other||entry?'Startup blocked: state folder is non-empty; use a dedicated empty folder.'
+     :leftovers?'State folder: '+leftovers+' leftover'+(leftovers===1?'':'s')+' of an interrupted first start (working copy or temporary state). Startup removes them if they hold only a copy of this site; otherwise it refuses the folder.'
+     :'State folder: dedicated empty folder, apart from permitted lease metadata.');
     rows.push('Lease metadata files: '+metadata+(entry?' (inspection limited to 1000 entries)':''));
    }
   }
