@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.10 — 2026-10-14
+
+Fixes for the plugin directory's review and for the fresh-user check of 0.1.9. The server, tools, pane and mod behave as in 0.1.9, and no feature was removed:
+
+- The Claude Code plugin's `.mcp.json` and the Desktop `manifest.json` no longer copy `SystemRoot` from the host into the server's environment. Claude Code starts plugin servers with its own environment, so the server still sees `SystemRoot` wherever it is set; on Linux the entry was empty, and the server reads it only on Windows, which is not supported. The Codex manifest still forwards it by name, and docs/CLAUDE-INSTALL.md no longer says that a host never passes its environment to an MCP process.
+- Tests only, the same checks: the second loopback server that sets cookies in the browser cookie test moved into `test/session-helper.js`; the reviewed tool-annotations test moved from `test/lifecycle.test.js` into `test/tool-annotations.test.js`; two preview-cache checks in `test/delta.test.js` run their child programs from `test/preview-cache-worker.js` instead of inline program text.
+- `tools/generate-release.py`, a maintainer script, reads the release file through the new `tools/release_fetch.py`; it still only compares the downloaded bytes.
+- The test runner test no longer fails with a `TMPDIR` of 37 to 62 bytes: it held its own temporary folder, 26 bytes longer than `TMPDIR`, to the 62-byte limit.
+- The Python test workers no longer leave `tools/__pycache__` behind, and the test checks it.
+- The Codex manifest's description now matches the Claude Code listing: "Edit static sites in a private working copy, with checkpoints, local preview and human-controlled export."
+- README: the `claude plugin configure` form that sets the three folders (`--values-stdin`, or `/plugin configure` in Claude Code); the marketplace installs `main`, which each release moves to its release commit; the client helper names the absolute Node.js path, so rerun it after changing Node.js; one plain sentence for each directory notice that stays (the pane's program and its command, and the publisher's name); every host the tests name, and which test processes get a reduced environment and which the test runner's. docs/TESTING.md says the archive holds every tracked file except the directory's listing image.
+
 ## 0.1.9 — 2026-10-13
 
 Codex self-distribution fixes; the server, tools, pane and mod are unchanged:

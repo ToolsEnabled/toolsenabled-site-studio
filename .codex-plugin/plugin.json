@@ -1,6 +1,6 @@
 {
   "name": "toolsenabled-site-studio",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "description": "Edit static sites in a private working copy, with checkpoints, local preview and human-controlled export.",
   "author": {
     "name": "ToolsEnabled, Inc.",
