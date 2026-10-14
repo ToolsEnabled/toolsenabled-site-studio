@@ -1,6 +1,7 @@
-import gzip,hashlib,importlib.util,io,subprocess,tarfile,tempfile,zipfile,zlib
+import gzip,hashlib,importlib.util,io,subprocess,sys,tarfile,tempfile,zipfile,zlib
 from pathlib import Path
 root=Path(__file__).resolve().parent.parent
+sys.dont_write_bytecode=True # load tools/*.py without leaving __pycache__ in the plugin folder
 spec=importlib.util.spec_from_file_location('handoff',root/'tools/handoff.py');module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
 with tempfile.TemporaryDirectory(prefix='site-studio-handoff-') as temp:
  work=Path(temp);source=work/'packet';source.mkdir();(source/'readme.txt').write_text('Synthetic public packet')

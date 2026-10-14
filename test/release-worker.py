@@ -1,7 +1,8 @@
-import hashlib,importlib.util,io,json,subprocess,tempfile,zipfile
+import hashlib,importlib.util,io,json,subprocess,sys,tempfile,urllib.request,zipfile
 from pathlib import Path
 from unittest.mock import patch
 root=Path(__file__).resolve().parent.parent
+sys.dont_write_bytecode=True # load tools/*.py without leaving __pycache__ in the plugin folder
 spec=importlib.util.spec_from_file_location('release',root/'tools/generate-release.py');module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
 with tempfile.TemporaryDirectory(prefix='site-studio-release-') as temp:
  work=Path(temp);repo=work/'source';repo.mkdir()
@@ -20,7 +21,7 @@ with tempfile.TemporaryDirectory(prefix='site-studio-release-') as temp:
  def command(args,**kwargs):
   if args[:2]==['git','ls-remote']:return commit+'\trefs/tags/'+tag+'\n'
   return original(args,**kwargs)
- with patch.object(module.subprocess,'check_output',side_effect=command),patch.object(module.urllib.request,'urlopen',side_effect=lambda *a,**kw:io.BytesIO(data)):
+ with patch.object(module.subprocess,'check_output',side_effect=command),patch.object(urllib.request,'urlopen',side_effect=lambda *a,**kw:io.BytesIO(data)):
   try:module.generate(repo,repository,tag,commit,signed,url,work/'missing-description',expected_tree=tree)
   except ValueError as e:assert 'description' in str(e)
   else:raise AssertionError('overlong description was silently shortened')
@@ -33,7 +34,7 @@ with tempfile.TemporaryDirectory(prefix='site-studio-release-') as temp:
   try:module.generate(repo,repository,tag,'0'*40,signed,url,work/'wrong-commit',expected_tree=tree)
   except ValueError as e:assert 'Remote tag' in str(e)
   else:raise AssertionError('unpublished commit accepted')
- with patch.object(module.subprocess,'check_output',side_effect=command),patch.object(module.urllib.request,'urlopen',side_effect=lambda *a,**kw:io.BytesIO(b'wrong bytes')):
+ with patch.object(module.subprocess,'check_output',side_effect=command),patch.object(urllib.request,'urlopen',side_effect=lambda *a,**kw:io.BytesIO(b'wrong bytes')):
   try:module.generate(repo,repository,tag,commit,signed,url,work/'wrong-bytes',description=reviewed,expected_tree=tree)
   except ValueError as e:assert 'Downloaded release bytes' in str(e)
   else:raise AssertionError('different download accepted')
@@ -44,7 +45,7 @@ with tempfile.TemporaryDirectory(prefix='site-studio-release-') as temp:
     value=change.get(name,(repo/name).read_bytes() if (repo/name).exists() else b'')
     if value is not None:z.writestr(name,value)
   bad=payload.getvalue()+b'MCPB_SIG_END';badfile=work/(label+'.mcpb');badfile.write_bytes(bad)
-  with patch.object(module.subprocess,'check_output',side_effect=command),patch.object(module.urllib.request,'urlopen',side_effect=lambda *a,**kw:io.BytesIO(bad)):
+  with patch.object(module.subprocess,'check_output',side_effect=command),patch.object(urllib.request,'urlopen',side_effect=lambda *a,**kw:io.BytesIO(bad)):
    try:module.generate(repo,repository,tag,commit,badfile,url,work/label,description=reviewed,expected_tree=tree)
    except ValueError as e:assert 'bundle' in str(e).lower()
    else:raise AssertionError('unreviewed bundle accepted: '+label)

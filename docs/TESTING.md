@@ -57,7 +57,7 @@ python3 tools/package.py --output /absolute/path/to/site-studio-a.zip
 python3 tools/package.py --output /absolute/path/to/site-studio-b.zip
 ```
 
-Compare their SHA256 hashes. The packager uses an explicit file manifest, rejects links and missing files, fixes member timestamps/modes and stores uncompressed bytes for reproducibility independent of zlib versions. The archive extracts to `site-studio/`; it includes runtime, docs, sample, tests and build manifest. State, dependencies, Git data, personal files, provider adapters and test output are excluded. Unzip in a new directory and run the full suite there. No registry, package download, model call or build service is needed.
+Compare their SHA256 hashes. The packager uses an explicit file manifest, rejects links and missing files, fixes member timestamps/modes and stores uncompressed bytes for reproducibility independent of zlib versions. The archive extracts to `site-studio/`; it includes runtime, docs, sample, tests and build manifest: every file in `tools/package-files.json`, which lists every tracked file except the plugin directory's listing image (a marketplace install copies the repository, so it also has that image). State, dependencies, Git data, personal files, provider adapters and test output are excluded. Unzip in a new directory and run the full suite there. No registry, package download, model call or build service is needed.
 
 ## Local command views and Claude hook tests
 

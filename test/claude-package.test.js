@@ -21,7 +21,11 @@ test('Claude folder options launch literal paths and preserve Codex sample defau
   const before = fs.readFileSync(path.join(options.site_directory, 'index.html'));
   const config = read('.mcp.json').mcpServers['site-studio'];
   assert.equal(config.command, 'node');
-  assert.deepEqual(config.env,{SITE_STUDIO_ROOT:'${user_config.site_directory}',SITE_STUDIO_DATA:'${user_config.data_directory}',SystemRoot:'${SystemRoot:-}'});
+  assert.deepEqual(config.env,{SITE_STUDIO_ROOT:'${user_config.site_directory}',SITE_STUDIO_DATA:'${user_config.data_directory}'});
+  // The server configs name only the plugin folder and the user's own options: no variable from the host's environment.
+  // Claude Code starts plugin servers with its own environment, so nothing needs copying (SystemRoot included).
+  for (const launch of [config, read('manifest.json').server.mcp_config]) for (const value of [...launch.args, ...Object.values(launch.env)])
+    for (const [reference] of value.matchAll(/\$\{[^}]*\}/g)) assert.match(reference, /^\$\{(CLAUDE_PLUGIN_ROOT|__dirname|user_config\.[a-z_]+)\}$/, value);
   for (const key of Object.keys(options)) assert.deepEqual([manifest.userConfig[key].type, manifest.userConfig[key].required], ['directory', true]);
   const args = config.args.map(arg => {
     let value = arg.replace('${CLAUDE_PLUGIN_ROOT}', root);

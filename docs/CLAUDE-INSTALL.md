@@ -45,7 +45,7 @@ For a replacement while you still have dashboard access, click **Renew dashboard
 
 ## Other clients
 
-The included Codex plugin manifest keeps its sample-default configuration inline in `.codex-plugin/plugin.json`, independent of Claude’s folder-option substitution. Codex explicitly forwards `SITE_STUDIO_ROOT`, `SITE_STUDIO_DATA` and `SystemRoot` through `env_vars`; set both to absolute paths when using a configured site instead of the bundled sample. Without these optional variables, Site Studio constructs absolute sample/state defaults. Claude Code and Desktop explicitly map the selected site/state folders into their launch environment as well as literal arguments. A host’s parent environment is not automatically inherited by an MCP process. This plugin configuration has no export destination, so export is disabled. To enable human export, register the server directly with `--export-dir` using the print-only helper. The helper supports Codex, Cursor, Claude Desktop and DeepSeek Harness. See [README](../README.md) for commands and runtime boundaries.
+The included Codex plugin manifest keeps its sample-default configuration inline in `.codex-plugin/plugin.json`, independent of Claude’s folder-option substitution. Codex explicitly forwards `SITE_STUDIO_ROOT`, `SITE_STUDIO_DATA` and `SystemRoot` through `env_vars`; set both to absolute paths when using a configured site instead of the bundled sample. Without these optional variables, Site Studio constructs absolute sample/state defaults. Claude Code and Desktop explicitly map the selected site/state folders into their launch environment as well as literal arguments. Codex passes an MCP process only a small default set of variables, such as `HOME` and `PATH`, and those listed in `env_vars`; Claude Code passes its own environment to plugin servers (see the [README](../README.md#mcp-server)). This plugin configuration has no export destination, so export is disabled. To enable human export, register the server directly with `--export-dir` using the print-only helper. The helper supports Codex, Cursor, Claude Desktop and DeepSeek Harness. See [README](../README.md) for commands and runtime boundaries.
 
 ## Claude Desktop bundle
 
@@ -111,7 +111,7 @@ claude plugin marketplace add ToolsEnabled/toolsenabled-site-studio
 claude plugin install toolsenabled-site-studio@toolsenabled-site-studio --config site_directory=/absolute/site --config data_directory=/absolute/private-state --config export_directory=/absolute/new-export
 ```
 
-`claude plugin configure toolsenabled-site-studio@toolsenabled-site-studio` shows or changes those options later, and a marketplace-installed plugin loads in every session without `--plugin-dir`. Stop/remove a duplicate direct MCP registration for the same state directory before loading the plugin. For the extracted folder instead, merge these nonsecret folder options into `.claude/settings.local.json` in the project (preserve any existing settings):
+`claude plugin configure toolsenabled-site-studio@toolsenabled-site-studio` shows those options later, and changes them when you pipe a JSON object of the three values to it with `--values-stdin` (or use `/plugin configure` inside Claude Code). A marketplace-installed plugin loads in every session without `--plugin-dir`. Stop/remove a duplicate direct MCP registration for the same state directory before loading the plugin. For the extracted folder instead, merge these nonsecret folder options into `.claude/settings.local.json` in the project (preserve any existing settings):
 
 ```json
 {

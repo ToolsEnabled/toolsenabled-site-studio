@@ -13,8 +13,7 @@
       ],
       "env": {
         "SITE_STUDIO_ROOT": "${user_config.site_directory}",
-        "SITE_STUDIO_DATA": "${user_config.data_directory}",
-        "SystemRoot": "${SystemRoot:-}"
+        "SITE_STUDIO_DATA": "${user_config.data_directory}"
       }
     }
   }

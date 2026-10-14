@@ -2,6 +2,9 @@
 const test=require('node:test');const assert=require('node:assert/strict');const {spawnSync}=require('node:child_process');const path=require('node:path');const {childEnv}=require('./helpers');
 const root=path.join(__dirname,'..');
 function bounded(script,timeout=2500){const r=spawnSync(process.execPath,['-e',script],{cwd:root,timeout,encoding:'utf8',env:childEnv()});assert.equal(r.error,undefined,r.error?.message);assert.equal(r.status,0,r.stderr);}
+// The two preview-cache checks that serve pages over loopback HTTP run from test/preview-cache-worker.js, so no inline
+// program here makes a request; same child, deadline and environment as bounded().
+function boundedWorker(name,timeout=2500){const r=spawnSync(process.execPath,[path.join(__dirname,'preview-cache-worker.js'),name],{cwd:root,timeout,encoding:'utf8',env:childEnv()});assert.equal(r.error,undefined,r.error?.message);assert.equal(r.status,0,r.stderr);}
 test('CSS writes and removals scan large separator runs within a time budget',()=>{
  bounded(`const {applyOp}=require('./src/web-model');const assert=require('node:assert/strict');
  for(const separator of ['\\n','\\r\\n',' \\n','\\u2028']){
@@ -46,7 +49,7 @@ test('attribute parsing does not rescan a large trailing whitespace run',()=>{
 });
 
 test('preview transformations are cached across query variants and invalidated on commit',()=>{
- bounded(`(async()=>{const assert=require('node:assert/strict');const cleanup=[];const o=require('./test/helpers').fixture({after:fn=>cleanup.push(fn)});const preview=require('./src/preview-content');const original=preview.previewBytes;let calls=0;preview.previewBytes=(...args)=>{calls++;return original(...args);};const app=require('./src/web-server').createCoordinator(o);try{await app.listen();const {url:base,headers}=await require('./test/session-helper').previewSession(app);for(let i=0;i<8;i++)await (await fetch(base+'/index.html?'+i,{headers})).text();assert.equal(calls,1);app.edit(require('./test/helpers').textOp(app.model,'Changed'));assert((await (await fetch(base+'/index.html',{headers})).text()).includes('Changed'));assert.equal(calls,2);}finally{await app.close();for(const fn of cleanup.reverse())await fn();}})().catch(e=>{console.error(e);process.exitCode=1;});`);
+ boundedWorker('transforms');
 });
 
 test('unparseable meta refresh tags fail closed in preview bytes',()=>{
@@ -236,7 +239,7 @@ test('preview limits count UTF-8 bytes and reject rewritten output before large 
 });
 
 test('preview failures are cached per snapshot across query variants',()=>{
- bounded(`(async()=>{const assert=require('node:assert/strict'),cleanup=[];const o=require('./test/helpers').fixture({after:fn=>cleanup.push(fn)});const preview=require('./src/preview-content');let calls=0;preview.previewBytes=()=>{calls++;throw Error('preview output limit');};const app=require('./src/web-server').createCoordinator(o);try{await app.listen();const session=await require('./test/session-helper').previewSession(app);for(let i=0;i<10;i++)assert.equal((await fetch(session.url+'/index.html?'+i,{headers:session.headers})).status,400);assert.equal(calls,1);app.edit(require('./test/helpers').textOp(app.model,'Changed'));assert.equal((await fetch(session.url+'/index.html',{headers:session.headers})).status,400);assert.equal(calls,2);}finally{await app.close();for(const fn of cleanup.reverse())await fn();}})().catch(e=>{console.error(e);process.exitCode=1;});`);
+ boundedWorker('failures');
 });
 
 test('HTML attributes decode legacy and numeric references without semicolons',()=>{

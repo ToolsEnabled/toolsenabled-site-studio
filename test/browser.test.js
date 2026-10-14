@@ -134,7 +134,7 @@ test('preview legacy attribute references match the browser HTML parser',async t
 });
 
 test('dashboard repairs preview cookie shadows and eviction without granting controls to cookies',async t=>{
- const http=require('node:http');let cookies=[];const foreign=http.createServer((req,res)=>{res.setHeader('Set-Cookie',cookies);res.end('<p>Other loopback server</p>');});await new Promise(r=>foreign.listen(0,'127.0.0.1',r));
+ let cookies=[];const foreign=require('./session-helper').foreignCookieServer(()=>cookies);await new Promise(r=>foreign.listen(0,'127.0.0.1',r));
  const app=createCoordinator(fixture(t));t.after(()=>app.close());await app.listen();const b=await browser();t.after(async()=>{await b.close();foreign.closeAllConnections();await new Promise(r=>foreign.close(r));});
  const responses=[];await b.send('Network.enable');b.on('Network.responseReceived',e=>responses.push(e.response));await browserPreview(b,app);const token=await b.evaluate('sessionStorage.getItem("site-studio-session")');
  async function cookieFor(url){return (await b.send('Network.getAllCookies')).cookies.find(c=>c.name==='site_studio_preview_'+url.split('/').at(-1)&&c.path===new URL(url).pathname+'/');}
