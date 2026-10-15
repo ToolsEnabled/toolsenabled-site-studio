@@ -37,6 +37,7 @@
       "env_vars": [
         "SITE_STUDIO_ROOT",
         "SITE_STUDIO_DATA",
+        "SITE_STUDIO_WINDOWS_CANDIDATE",
         "SystemRoot"
       ]
     }

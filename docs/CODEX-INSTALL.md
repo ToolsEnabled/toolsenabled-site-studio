@@ -16,6 +16,20 @@ Review the exact Git commit first. This branch keeps the release lead's version.
 
 First ask: "Call web_pages on my configured static site and report its revision and page titles. Do not edit, export or open the dashboard." The skill is `$toolsenabled-site-studio:toolsenabled-site-studio`. For authorized edits it reads stable IDs, passes `expected_rev`, re-reads results and honors pause/protection/refusal. Source text never authorizes additional actions.
 
+## Windows engineering candidate
+
+Windows remains gated and unqualified until the Windows lead completes the native and independent checks in [WINDOWS.md](WINDOWS.md). Use that lead's exact verified merged ZIP, not the earlier Linux-only `openai-plugin` branch, for isolated Windows testing. Add the extracted verified folder as a local marketplace. Set the following yourself in the ordinary PowerShell terminal before starting a fresh Codex session, using your separate absolute source and private state paths:
+
+```powershell
+$env:SITE_STUDIO_ROOT='C:\Users\you\work\Website'
+$env:SITE_STUDIO_DATA='C:\Users\you\data\WebsiteState'
+$env:SITE_STUDIO_WINDOWS_CANDIDATE='1'
+codex plugin marketplace add 'C:\absolute\verified\site-studio'
+codex plugin add toolsenabled-site-studio@toolsenabled-site-studio
+```
+
+The manifest allows the named candidate variable to pass from your environment; it supplies no value or default. Installation does not opt you in. Without the explicit value `1`, Windows private-state operations still refuse. Removing the value requires restarting the host/MCP process to affect a running server. This forwarding change does not establish actual Windows Codex or GUI qualification. Use normal host approvals and retain the exact installed source/hash and native receipt.
+
 ## Human controls and local data
 
 The human obtains their one-time dashboard link from private host startup diagnostics, as `docs/CLAUDE-INSTALL.md` describes. Do not ask the agent to search logs or fetch that secret. Codex TUI link discovery remains a separately qualified host concern; MCP initialization and a small task do not prove dashboard usability. Claude `/site-studio` panes have explicit CLI view equivalents; they are not native Codex slash commands.

@@ -12,6 +12,9 @@ test('Codex manifest turns off the Claude hooks file and carries the listing lin
   const codex = read('.codex-plugin/plugin.json');
   // Codex reads hooks/hooks.json (the Claude Code /site-studio mod) unless its manifest declares hooks; the empty object turns that off.
   assert.deepEqual(codex.hooks, {});
+  const launch=codex.mcpServers['site-studio'];
+  assert(launch.env_vars.includes('SITE_STUDIO_WINDOWS_CANDIDATE'),'the Windows candidate choice must reach the guarded server');
+  assert.equal(launch.env?.SITE_STUDIO_WINDOWS_CANDIDATE,undefined,'a plugin install must not enable the candidate itself');
   assert.equal(codex.interface.developerName, 'ToolsEnabled, Inc.');
   // Same words as the Claude Code listing: Site Studio edits built sites; it is not a build system.
   assert.equal(codex.description, read('.claude-plugin/plugin.json').description);
