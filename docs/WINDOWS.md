@@ -1,6 +1,6 @@
 # Native Windows candidate: qualification pending
 
-This branch prepares Site Studio 0.1.11 for native Windows 10/11 x64 with Node 22+ and Windows PowerShell 5.1. It uses no WSL, MSYS or Cygwin. **Native execution is currently unqualified and gated**: the real Windows host went offline during the port. Do not offer this candidate as a supported Windows release. Windows 11, an ordinary Windows token, actual DACL enforcement, hardlink/rename semantics, pane bootstrap and GUI/plugin-host behavior have not been proved.
+This branch prepares Site Studio 0.1.11 for native Windows 10/11 x64 with Node 22+ and Windows PowerShell 5.1. It uses no WSL, MSYS or Cygwin. **Native execution is currently unqualified and gated**. The host has returned after the initial outage; this exact Site Studio candidate still needs native qualification. Do not offer it as a supported Windows release. Windows 11, an ordinary Windows token, actual DACL enforcement, hardlink/rename semantics, pane bootstrap and GUI/plugin-host behavior have not been proved.
 
 The Linux baseline is 276 passed. New Windows tests include lexical/argument checks on Linux; native-only cases explicitly skip there. Those skips are not Windows evidence. Main/tag/release/directory submissions stay unchanged.
 
@@ -33,6 +33,8 @@ The default Windows state location, if no explicit data folder is supplied, is t
 ## Native acceptance still required
 
 Set TEMP/TMP to a private test folder and run one job at a time. For maintainer tests, set PYTHON to the actual Python executable (packaging/test dependency only); the product runtime has no Python dependency. Windows has no Unix socket path-length limit: the test runner's Windows branch uses native path validation instead. Start with `node --test --test-concurrency=1 test/windows-native.test.js`, then the stdio lifecycle and security/store/lease/pane tests and full suite with an actual private headless Edge/Chrome path. Record exact counts and skips. Do not change Developer Mode, ACLs outside your created fixtures or machine policy.
+
+The native test also runs eight authored in-memory raw-DACL cases through the actual product assessor in Windows PowerShell 5.1. Safe read, sibling-creation and inherit-only grants must pass; active replacement grants, outside private grants and null DACLs must refuse for their stated policy reason. The helper casts enum operands to integers before bitwise operations so byte-backed `AceFlags` does not cause an invalid-cast error in PowerShell 5.1. This regression fixture does not replace actual filesystem ACL/ancestor tests.
 
 Prove: normal-token private creation and broad/null/foreign DACL refusal without repair; unsafe ancestor owner/write rights; NTFS hardlink leases and source hardlink refusal; live writer exclusion, stale same-SID creation-identity recovery and unverifiable legacy SID refusal; case/8.3 aliases; junctions/device/ADS paths; forced rename sharing failures with retained state/original backup; EOF graceful shutdown versus forced process termination; poison NODE_OPTIONS/credential environment refusal before the pane's Node starts; exact-origin dashboard and human-only export. Windows SIGTERM is forced termination: do not count its cleanup as graceful. EOF is the cross-platform graceful path.
 

@@ -20,6 +20,13 @@ test('native Windows candidate requires explicit opt in before private directory
   try{assert.throws(()=>native.privateDirectory(path.join(require('node:os').tmpdir(),'must-not-be-created')),/unqualified candidate/);}
   finally{if(before===undefined)delete process.env.SITE_STUDIO_WINDOWS_CANDIDATE;else process.env.SITE_STUDIO_WINDOWS_CANDIDATE=before;}
 });
+test('Windows PowerShell 5.1 raw ACL assessor accepts safe grants and refuses replacement rights',{skip:process.platform!=='win32'},t=>{
+  process.env.SITE_STUDIO_WINDOWS_CANDIDATE='1';
+  const root=path.join(require('node:os').tmpdir(),'site-studio-acl-'+require('node:crypto').randomBytes(8).toString('hex'));
+  native.privateDirectory(root);t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  const r=require('node:child_process').spawnSync('C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',['-NoLogo','-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',path.join(__dirname,'windows-acl-flags.test.ps1'),'-ProbeDirectory',root],{encoding:'utf8',timeout:20000,windowsHide:true});
+  assert.equal(r.status,0,r.stderr);const receipt=JSON.parse(r.stdout);assert.equal(receipt.passed,8);assert.equal(receipt.failed,0);assert.equal(receipt.powershellMajor,5);
+});
 test('native private state survives case-alias restart and refuses a hard-linked source',{skip:process.platform!=='win32'},t=>{
   process.env.SITE_STUDIO_WINDOWS_CANDIDATE='1';
   const root=path.join(require('node:os').tmpdir(),'site-studio-native-'+require('node:crypto').randomBytes(8).toString('hex'));

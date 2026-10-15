@@ -97,6 +97,7 @@
   "test/view-inspect.test.js",
   "test/views-expanded.test.js",
   "test/views.test.js",
+  "test/windows-acl-flags.test.ps1",
   "test/windows-native.test.js",
   "tools/generate-release.py",
   "tools/handoff.py",

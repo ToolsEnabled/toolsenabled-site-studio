@@ -24,7 +24,7 @@ function Check-Path([string]$value){
 }
 function Check-Entry([string]$value,[bool]$private,[bool]$ancestor){
   $attributes=[IO.File]::GetAttributes($value)
-  if($attributes -band [IO.FileAttributes]::ReparsePoint){throw 'Reparse point refused'}
+  if(([int]$attributes -band [int][IO.FileAttributes]::ReparsePoint) -ne 0){throw 'Reparse point refused'}
   $acl=Get-Acl -LiteralPath $value
   $owner=$acl.GetOwner([Security.Principal.SecurityIdentifier]).Value
   if($private -and $owner -ne $sid){throw 'Private entry owner differs'}
@@ -36,7 +36,8 @@ function Check-Entry([string]$value,[bool]$private,[bool]$ancestor){
     if($ace.AceType -ne [Security.AccessControl.AceType]::AccessAllowed){throw 'Unknown DACL grant refused'}
     if($trusted -contains $ace.SecurityIdentifier.Value){continue}
     if($private){throw 'Private entry grants another principal access'}
-    if(($ace.AceFlags -band [Security.AccessControl.AceFlags]::InheritOnly) -eq 0 -and ([int64]$ace.AccessMask -band 0x500D0140)){throw 'Ancestor replacement rights refused'}
+    # Windows PowerShell 5.1 cannot reliably apply -band to byte-backed enums.
+    if(([int]$ace.AceFlags -band [int][Security.AccessControl.AceFlags]::InheritOnly) -eq 0 -and ([int64]$ace.AccessMask -band [int64]0x500D0140)){throw 'Ancestor replacement rights refused'}
   }
 }
 function Check-Parents([string]$value){
