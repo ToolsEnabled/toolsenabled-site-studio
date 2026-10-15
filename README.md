@@ -1,5 +1,7 @@
 # ToolsEnabled Site Studio 0.1.11 candidate
 
+Codex setup and limits: [docs/CODEX-INSTALL.md](docs/CODEX-INSTALL.md).
+
 **Linux is tested. Native Windows 0.1.11 is an unqualified candidate**, gated for isolated testing; see [Windows candidate](docs/WINDOWS.md). macOS and native desktop-client installation remain unqualified.
 
 Edit a static website through any MCP host. Site Studio makes a private working copy, provides a live browser preview, and keeps revision history and named checkpoints. The human controls pause, undo, restore, and export. Your original folder stays unchanged until you explicitly confirm an export to it.
