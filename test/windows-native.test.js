@@ -85,7 +85,10 @@ test('installer custody JSON preserves Unicode from a nested PowerShell function
     "if($records.Count -ne 3){throw 'Expected three exact native Unicode captures'}",
     '@{powershellMajor=5;globalEncodingBefore=$before.CodePage;globalEncodingAfter=$after.CodePage;globalObjectUnchanged=$true;capturesJson=$capturesJson}|ConvertTo-Json -Depth 6',''
   ].join('\n'));
-  const result=require('node:child_process').spawnSync(path.win32.join(process.env.SystemRoot,'System32','WindowsPowerShell','v1.0','powershell.exe'),['-NoLogo','-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',harness,'-Installer',path.join(__dirname,'..','install.ps1'),'-Child',child,'-Nested',nested,'-Root',root,'-Output',output],{encoding:'utf8',env:require('./helpers').childEnv(),timeout:30000,windowsHide:true});
+  // This fixture launches PowerShell from PowerShell. With PATHEXT omitted,
+  // WinPS5 adds only .CPL and treats the nested .exe as a document, not a pipe.
+  const env={...require('./helpers').childEnv(),PATHEXT:'.COM;.EXE;.BAT;.CMD'};
+  const result=require('node:child_process').spawnSync(path.win32.join(process.env.SystemRoot,'System32','WindowsPowerShell','v1.0','powershell.exe'),['-NoLogo','-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',harness,'-Installer',path.join(__dirname,'..','install.ps1'),'-Child',child,'-Nested',nested,'-Root',root,'-Output',output],{encoding:'utf8',env,timeout:30000,windowsHide:true});
   assert.ifError(result.error);assert.equal(result.status,0,result.stderr);
   const receipt=JSON.parse(result.stdout);assert.equal(receipt.powershellMajor,5);assert.equal(receipt.globalEncodingBefore,20127);assert.equal(receipt.globalEncodingAfter,20127);assert.equal(receipt.globalObjectUnchanged,true);
   const captures=JSON.parse(receipt.capturesJson);
