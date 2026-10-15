@@ -48,3 +48,47 @@ test('native asynchronous startup abort releases the acquired lease',{skip:proce
   await assert.rejects(require('../src/studio-store').createStoreAsync(o,controller.signal),e=>e.name==='AbortError');
   clearInterval(timer);assert(sawLease);assert(!fs.existsSync(path.join(o.dataRoot,'lease.json')));
 });
+test('installer custody JSON preserves Unicode from a nested PowerShell function without changing global encoding',{skip:process.platform!=='win32'},async t=>{
+  const previous=process.env.SITE_STUDIO_WINDOWS_CANDIDATE;process.env.SITE_STUDIO_WINDOWS_CANDIDATE='1';
+  t.after(()=>{if(previous===undefined)delete process.env.SITE_STUDIO_WINDOWS_CANDIDATE;else process.env.SITE_STUDIO_WINDOWS_CANDIDATE=previous;});
+  const root=path.join(require('node:os').tmpdir(),'site-installer-json-'+require('node:crypto').randomBytes(8).toString('hex'));
+  native.privateDirectory(root);t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  const write=(name,text)=>{const file=path.join(root,name);fs.writeFileSync(file,'\uFEFF'+text,'utf8');return file;};
+  const child=write('capture.ps1',[
+    "$ErrorActionPreference='Stop'",'[Console]::InputEncoding=New-Object Text.UTF8Encoding($false)','[Console]::OutputEncoding=New-Object Text.UTF8Encoding($false)',
+    '$raw=[Console]::In.ReadToEnd()','$request=$raw|ConvertFrom-Json',"if($request.operation -cne 'canonical'){throw 'Only inert canonical requests permitted'}",
+    '$full=[IO.Path]::GetFullPath([string]$request.path)',
+    "@{schema='site-studio/windows-custody/1';ok=$true;path=$full;rawAsciiOnly=(-not[regex]::IsMatch($raw,'[^\\x00-\\x7f]'));codes=@($full.ToCharArray()|ForEach-Object{[int]$_})}|ConvertTo-Json -Depth 5 -Compress",''
+  ].join('\n'));
+  const nested=write('nested.ps1',[
+    'param([string]$Installer,[string]$Child,[string]$Root,[string]$Output)',"$ErrorActionPreference='Stop'",
+    '[Console]::OutputEncoding=New-Object Text.UTF8Encoding($false)','$OutputEncoding=New-Object Text.UTF8Encoding($false)',
+    '$tokens=$null;$parseErrors=$null','$ast=[Management.Automation.Language.Parser]::ParseFile($Installer,[ref]$tokens,[ref]$parseErrors)',
+    "if($parseErrors.Count){throw 'Installer AST did not parse'}",
+    "$function=$ast.Find({param($node)$node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -ceq 'Native-Operation'},$true)",
+    "if($null -eq $function){throw 'Actual installer function absent'}",'Invoke-Expression $function.Extent.Text',
+    "$ps=Join-Path ([Environment]::SystemDirectory) 'WindowsPowerShell\\v1.0\\powershell.exe'",'$helper=$Child',
+    "$values=@((Join-Path $Root 'café-中文'),(Join-Path $Root \"Website's résumé\"),(Join-Path $Root 'Emoji 😀 and combining é'))",
+    '$records=@()','foreach($value in $values){'," $answer=Native-Operation 'canonical' $value",
+    " if($answer.path -cne $value -or $answer.rawAsciiOnly -ne $true){throw 'Native request lost Unicode or sent non-ASCII bytes'}",
+    ' $records+=@{path=$answer.path;codes=$answer.codes;rawAsciiOnly=$answer.rawAsciiOnly}','}',
+    '[IO.File]::WriteAllText($Output,($records|ConvertTo-Json -Depth 5),(New-Object Text.UTF8Encoding($false)))',''
+  ].join('\n'));
+  const output=path.join(root,'captures.json'),harness=write('harness.ps1',[
+    'param([string]$Installer,[string]$Child,[string]$Nested,[string]$Root,[string]$Output)',"$ErrorActionPreference='Stop'",
+    '$before=(Get-Variable -Name OutputEncoding -Scope Global).Value',
+    "if($PSVersionTable.PSVersion.Major -ne 5 -or $before.CodePage -ne 20127){throw 'Regression requires fresh WindowsPowerShell5 ASCII native-pipe baseline'}",
+    '& $Nested -Installer $Installer -Child $Child -Root $Root -Output $Output',
+    '$after=(Get-Variable -Name OutputEncoding -Scope Global).Value',
+    "if(-not[Object]::ReferenceEquals($before,$after)){throw 'Installer function changed global encoding preference'}",
+    '$capturesJson=[IO.File]::ReadAllText($Output,[Text.Encoding]::UTF8)','$records=$capturesJson|ConvertFrom-Json',
+    "if($records.Count -ne 3){throw 'Expected three exact native Unicode captures'}",
+    '@{powershellMajor=5;globalEncodingBefore=$before.CodePage;globalEncodingAfter=$after.CodePage;globalObjectUnchanged=$true;capturesJson=$capturesJson}|ConvertTo-Json -Depth 6',''
+  ].join('\n'));
+  const result=require('node:child_process').spawnSync(path.win32.join(process.env.SystemRoot,'System32','WindowsPowerShell','v1.0','powershell.exe'),['-NoLogo','-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',harness,'-Installer',path.join(__dirname,'..','install.ps1'),'-Child',child,'-Nested',nested,'-Root',root,'-Output',output],{encoding:'utf8',env:require('./helpers').childEnv(),timeout:30000,windowsHide:true});
+  assert.ifError(result.error);assert.equal(result.status,0,result.stderr);
+  const receipt=JSON.parse(result.stdout);assert.equal(receipt.powershellMajor,5);assert.equal(receipt.globalEncodingBefore,20127);assert.equal(receipt.globalEncodingAfter,20127);assert.equal(receipt.globalObjectUnchanged,true);
+  const captures=JSON.parse(receipt.capturesJson);
+  assert(Array.isArray(captures));assert.equal(captures.length,3);assert(captures.every(row=>row.rawAsciiOnly));assert(captures[2].codes.includes(0xd83d)&&captures[2].codes.includes(0xde00)&&captures[2].codes.includes(0x301));
+  await require('./helpers').saveEvidence(e=>e.write('windows/installer-nested-json.json',JSON.stringify(receipt,null,2)+'\n'));
+});

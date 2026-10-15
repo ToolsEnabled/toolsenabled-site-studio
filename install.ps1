@@ -19,6 +19,7 @@ $helper=Join-Path $source 'src\windows-private.ps1'
 $ps=Join-Path ([Environment]::SystemDirectory) 'WindowsPowerShell\v1.0\powershell.exe'
 function Native-Operation([string]$operation,[string]$target){
  $request=@{operation=$operation;path=$target}|ConvertTo-Json -Compress
+ $request=[regex]::Replace($request,'[^\x00-\x7f]',[Text.RegularExpressions.MatchEvaluator]{param($m) '\u{0:x4}' -f [int][char]$m.Value})
  $answer=$request|& $ps -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $helper
  if($LASTEXITCODE -ne 0){throw 'Native folder custody refused; nothing existing was repaired'}
  $receipt=$answer|ConvertFrom-Json
