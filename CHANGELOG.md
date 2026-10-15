@@ -1,9 +1,5 @@
 # Changelog
 
-## Unreleased — Codex branch
-
-- Document reviewed-branch marketplace installation, real MCP setup, human authority, retained local data and host-specific limits.
-
 ## 0.1.11 — Windows candidate, not released
 
 - Prepare native SID/DACL private state, canonical Windows root/lock identity and explicit namespace refusals.

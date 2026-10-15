@@ -2,6 +2,8 @@
 
 Use Node.js 22+. Choose a static output folder and a separate private state folder outside the plugin cache. Set absolute `SITE_STUDIO_ROOT` and `SITE_STUDIO_DATA` values in the environment before launching Codex. With neither set, the bundled sample and its default state are selected; explicitly choose external folders for durable work. The source folder remains unchanged; edits go to the private working copy. See README for accepted file types, limits and path custody.
 
+Unreleased branch change: Codex installation and authority guidance; no independent product release.
+
 ## Install a reviewed branch
 
 ```sh
