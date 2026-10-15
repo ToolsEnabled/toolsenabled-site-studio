@@ -13,7 +13,7 @@ function validLabel(label){return typeof label==='string'&&label===label.trim()&
 function atomicJson(file,value) {
   const temp=file+'.'+crypto.randomBytes(8).toString('hex')+'.tmp';
   try {
-    const fd=fs.openSync(temp,'wx',0o600);
+    const fd=native.privateFile(temp);
     try {fs.writeFileSync(fd,JSON.stringify(value));fs.fsyncSync(fd);} finally {fs.closeSync(fd);}
     fs.renameSync(temp,file);
   } finally {if(fs.existsSync(temp))fs.unlinkSync(temp);}

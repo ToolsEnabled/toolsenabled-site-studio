@@ -8,9 +8,9 @@ function start(o={},entry='mcp-web.js') {
   const rpc=(method,params)=>new Promise((resolve,reject)=>{const next=++id;if(process.env.TEST_TRACE)process.stderr.write('send '+next+' '+method+' '+(params?.name||'')+'\n');const timer=setTimeout(()=>reject(Error('RPC timeout '+method+': '+stderr)),5000);pending.set(next,{resolve,reject,timer});child.stdin.write(JSON.stringify({jsonrpc:'2.0',id:next,method,params})+'\n');});
   const tool=async(name,args={})=>{const m=await rpc('tools/call',{name,arguments:args});if(m.error||m.result.isError)throw Error(JSON.stringify(m));return JSON.parse(m.result.content[0].text);};
   const init=()=>rpc('initialize',{protocolVersion:'2025-06-18',capabilities:{},clientInfo:{name:'synthetic-test',version:'1'}});
-  const stop=async()=>{if(process.env.TEST_TRACE)process.stderr.write('stop '+child.pid+' '+child.exitCode+'\n');if(child.exitCode!==null)return exited;child.stdin.end();let timer;try{return await Promise.race([exited,new Promise((_,reject)=>{timer=setTimeout(()=>{child.kill('SIGKILL');reject(Error('shutdown timeout'));},5000);})]);}finally{clearTimeout(timer);for(const p of pending.values())clearTimeout(p.timer);}};
+  const stop=async()=>{if(process.env.TEST_TRACE)process.stderr.write('stop '+child.pid+' '+child.exitCode+'\n');if(child.exitCode!==null)return exited;child.stdin.end();let timer;try{return await Promise.race([exited,new Promise((_,reject)=>{timer=setTimeout(()=>{child.kill('SIGKILL');reject(Error('shutdown timeout'));},process.platform==='win32'?30000:5000);})]);}finally{clearTimeout(timer);for(const p of pending.values())clearTimeout(p.timer);}};
   return {child,rpc,tool,init,stop,exited,output,get stderr(){return stderr;}};
 }
 // Runs mcp-web.js once to completion on the given stdin, with --site and --data-dir only and the same environment as start().
-function runOnce(o,input){return spawnSync(process.execPath,[path.join(__dirname,'..','mcp-web.js'),'--site',o.sourceRoot,'--data-dir',o.dataRoot],{input,encoding:'utf8',timeout:5000,env:childEnv()});}
+function runOnce(o,input){return spawnSync(process.execPath,[path.join(__dirname,'..','mcp-web.js'),'--site',o.sourceRoot,'--data-dir',o.dataRoot],{input,encoding:'utf8',timeout:process.platform==='win32'?30000:5000,env:childEnv()});}
 module.exports={start,runOnce};

@@ -1,9 +1,10 @@
 'use strict';
+const {childEnv:osChildEnv}=require('./helpers');
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const {spawnSync}=require('node:child_process');
 const {fixture,textOp}=require('./helpers'),{createStore}=require('../src/studio-store'),{hash}=require('../src/web-model');
 const root=path.join(__dirname,'..'),cli=path.join(root,'tools/site-studio-view.js');
-function cliRun(args,env){return spawnSync(process.execPath,[cli,...args,'--json'],{encoding:'utf8',timeout:5000,env:{PATH:process.env.PATH,...env}});}
+function cliRun(args,env){return spawnSync(process.execPath,[cli,...args,'--json'],{encoding:'utf8',timeout:process.platform==='win32'?30000:5000,env:{...osChildEnv(),...env}});}
 function rowsOf(o,view,args=[]){
  const read=extra=>{const r=cliRun([view,...args,'--site',o.sourceRoot,'--data-dir',o.dataRoot,...extra]);assert.equal(r.status,0,r.stderr);return JSON.parse(r.stdout);};
  let p=read([]);const rows=[...p.rows];
@@ -34,9 +35,17 @@ test('changes says where a difference is when the displayed text cannot show it'
 test('Codex default state folder matches the server when SITE_STUDIO_ROOT ends with a separator',t=>{
  const o=fixture(t),home=path.join(o.root,'home');fs.mkdirSync(home,{mode:0o700});
  const env={HOME:home,USERPROFILE:home,SITE_STUDIO_ROOT:o.sourceRoot+path.sep};
- const started=spawnSync(process.execPath,['-e',"require(process.argv[1]).createStore({}).close()",path.join(root,'src/studio-store.js')],{encoding:'utf8',timeout:20000,env:{PATH:process.env.PATH,...env}});
+ if(process.platform==='win32'){
+  // Native defaults come from the account's Known Folder, not an untrusted HOME.
+  // Compare discovery read-only; the real server/reader use our explicit root.
+  const native=require('../src/native-filesystem'),{checkedPath}=require('../src/web-import');
+  const keys=[o.sourceRoot,o.sourceRoot+path.sep].map(p=>hash(native.pathKey(checkedPath(p))).slice(7,23));
+  assert.equal(keys[0],keys[1]);assert.equal(native.defaultDataRoot(keys[0]),native.defaultDataRoot(keys[1]));
+  env.SITE_STUDIO_DATA=o.dataRoot;
+ }
+ const started=spawnSync(process.execPath,['-e',"require(process.argv[1]).createStore({}).close()",path.join(root,'src/studio-store.js')],{encoding:'utf8',timeout:process.platform==='win32'?60000:20000,env:{...osChildEnv(),...env}});
  assert.equal(started.status,0,started.stderr);
- assert(fs.existsSync(path.join(home,'.site-studio',hash(o.sourceRoot).slice(7,23),'state.json')),'server default state folder');
+ assert(fs.existsSync(process.platform==='win32'?path.join(o.dataRoot,'state.json'):path.join(home,'.site-studio',hash(o.sourceRoot).slice(7,23),'state.json')),'server state folder');
  const r=cliRun(['home'],env);assert.equal(r.status,0,r.stderr);
  const rows=JSON.parse(r.stdout).rows;assert(rows[0].startsWith('Working copy r0'),rows[0]);
 });

@@ -2,6 +2,23 @@
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+// Windows elevated tokens default to Administrators as the owner. State fixtures
+// must ask for the current SID explicitly, just as the product does.
+function privateMkdir(target,options={}) {
+  if(process.platform==='win32')require('../src/native-filesystem').privateDirectory(target);
+  else fs.mkdirSync(target,options);
+}
+function privateWrite(target,data,options) {
+  if(process.platform==='win32'&&!fs.existsSync(target)) {
+    const fd=require('../src/native-filesystem').privateFile(target);
+    try{fs.writeFileSync(fd,data,options);}finally{fs.closeSync(fd);}
+  } else fs.writeFileSync(target,data,options);
+}
+function publicReadFixture(target) {
+  if(process.platform!=='win32'){fs.chmodSync(target,0o755);return;}
+  const script='[Console]::InputEncoding=New-Object Text.UTF8Encoding($false);$ErrorActionPreference="Stop";$p=[Console]::In.ReadToEnd();$acl=Get-Acl -LiteralPath $p;$rule=New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier("S-1-5-32-545")),[Security.AccessControl.FileSystemRights]::ReadAndExecute,[Security.AccessControl.AccessControlType]::Allow);[void]$acl.AddAccessRule($rule);Set-Acl -LiteralPath $p -AclObject $acl';
+  require('node:child_process').execFileSync(path.win32.join(process.env.SystemRoot,'System32','WindowsPowerShell','v1.0','powershell.exe'),['-NoLogo','-NoProfile','-NonInteractive','-Command',script],{input:target,encoding:'utf8',env:childEnv(),timeout:15000,windowsHide:true});
+}
 function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'site-studio-test-'));
   t.after(() => fs.rmSync(root, {recursive:true, force:true}));
@@ -61,4 +78,4 @@ function tmpdirProblem(dir = os.tmpdir()) {
   if (real !== dir) return `TMPDIR must be its folder's real path: ${dir} resolves to ${real} (through a symbolic link, or . or .. parts). The working-copy store refuses paths that go through a symbolic link, by design. Use TMPDIR=${real}.`;
   return tmpdirLengthProblem(dir);
 }
-module.exports={fixture,textOp,childEnv,saveEvidence,tmpdirProblem,tmpdirLengthProblem};
+module.exports={fixture,textOp,childEnv,privateMkdir,privateWrite,publicReadFixture,saveEvidence,tmpdirProblem,tmpdirLengthProblem};

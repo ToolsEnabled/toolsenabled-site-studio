@@ -100,6 +100,7 @@
   "test/views.test.js",
   "test/windows-acl-flags.test.ps1",
   "test/windows-native.test.js",
+  "test/windows-state-custody.ps1",
   "tools/generate-release.py",
   "tools/handoff.py",
   "tools/mcp-config.mjs",

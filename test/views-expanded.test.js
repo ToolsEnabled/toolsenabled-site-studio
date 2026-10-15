@@ -1,8 +1,9 @@
 'use strict';
+const {childEnv:osChildEnv}=require('./helpers');
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const {fixture,textOp}=require('./helpers'),{createStore}=require('../src/studio-store');
 const {spawnSync}=require('node:child_process');const cli=path.join(__dirname,'../tools/site-studio-view.js');
-function run(o,view,args=[]){return spawnSync(process.execPath,[cli,view,...args,'--site',o.sourceRoot,'--data-dir',o.dataRoot,'--export-dir',o.exportRoot,'--json'],{encoding:'utf8',timeout:5000});}
+function run(o,view,args=[]){return spawnSync(process.execPath,[cli,view,...args,'--site',o.sourceRoot,'--data-dir',o.dataRoot,'--export-dir',o.exportRoot,'--json'],{encoding:'utf8',timeout:process.platform==='win32'?30000:5000});}
 function read(o,view,args=[]){const p=run(o,view,args);assert.equal(p.status,0,p.stderr);return JSON.parse(p.stdout);}
 function all(o,view,args=[]){let p=read(o,view,args),rows=[...p.rows];for(let i=0;p.nextOffset!==null;i++){assert(i<130);p=read(o,view,[...args,'--offset',String(p.nextOffset),'--snapshot',p.snapshot]);rows.push(...p.rows);}return rows.join('\n');}
 test('rich home/pages/checkpoints reflect current state without absolute paths or secrets',t=>{
@@ -44,5 +45,5 @@ test('doctor and dashboard explain refusals, and export shows read-only readines
 });
 test('missing state is neutral, defaults match the server, and view args never become a shell',t=>{
  const o=fixture(t);assert.match(all(o,'home'),/not opened yet/i);assert(!fs.existsSync(o.dataRoot));
- const env={PATH:process.env.PATH,HOME:path.join(o.root,'home')};const p=spawnSync(process.execPath,[cli,'home','--json'],{env,encoding:'utf8',timeout:5000});assert.equal(p.status,0,p.stderr);assert.match(p.stdout,/not opened yet/i);assert(!fs.existsSync(env.HOME));
+ const env={...osChildEnv(),HOME:path.join(o.root,'home')};const p=spawnSync(process.execPath,[cli,'home','--json',...(process.platform==='win32'?['--site',o.sourceRoot,'--data-dir',o.dataRoot]:[])],{env,encoding:'utf8',timeout:process.platform==='win32'?30000:5000});assert.equal(p.status,0,p.stderr);assert.match(p.stdout,/not opened yet/i);assert(!fs.existsSync(env.HOME));
 });

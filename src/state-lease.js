@@ -4,6 +4,7 @@ const path=require('node:path');
 const crypto=require('node:crypto');
 const os=require('node:os');
 const {execFileSync}=require('node:child_process');
+const native=require('./native-filesystem');
 
 // A PID can be reused. Always compare its OS process creation identity as well.
 function processIdentity(pid) {
@@ -71,12 +72,12 @@ function ownerAlive(owner,scope,file) {
   return current.kind===owner.process.kind&&current.startTime===owner.process.startTime&&current.bootId===owner.process.bootId;
 }
 function acquireLease(directory) {
-  if(process.platform==='win32')require('./native-filesystem').privateDirectory(directory,{existing:true,tree:true});
+  if(process.platform==='win32')native.privateDirectory(directory,{existing:true,tree:true});
   const file=path.join(directory,'lease.json');
   const owner={pid:process.pid,entry:'site-studio',nonce:crypto.randomBytes(16).toString('hex'),process:processIdentity(process.pid),scope:identityScope()};
   if(!owner.process)throw Error('Cannot determine this process state lease identity');
   const temporary=path.join(directory,'.lease-temp-'+owner.nonce);
-  const fd=fs.openSync(temporary,'wx',0o600);
+  const fd=native.privateFile(temporary);
   try{fs.writeFileSync(fd,JSON.stringify(owner));fs.fsyncSync(fd);}finally{fs.closeSync(fd);}
   const claims=[];let leaseStat,recovered=false;
   const publish=target=>{try{fs.linkSync(temporary,target);return true;}catch(e){if(e.code==='EEXIST')return false;if(e.code==='ENOENT')throw Error('State lease startup interrupted; retry startup.');throw e;}};

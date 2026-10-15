@@ -14,7 +14,7 @@ test('export preflight reports destination, lock and source drift without writin
  const args={...o,originalFingerprint:state.originalFingerprint};const entries=fs.readdirSync(o.root);let r=exportPreflight(args);assert.equal(r.ready,true);assert.equal(r.originalDrift,false);assert.equal(r.destinationExists,false);assert.deepEqual(fs.readdirSync(o.root),entries);
  assert.equal(exportPreflight({...args,exportRoot:undefined}).configured,false);
  fs.mkdirSync(o.exportRoot);assert.equal(exportPreflight(args).ready,false);
- const lock=path.join(o.root,'.site-studio-export-'+require('../src/web-model').hash(o.exportRoot).slice(7,31)+'.lock');fs.writeFileSync(lock,'{"pid":123}');const bytes=fs.readFileSync(lock);assert.equal(exportPreflight(args).lockPresent,true);assert.deepEqual(fs.readFileSync(lock),bytes);
+ const lock=path.join(o.root,'.site-studio-export-'+require('../src/web-model').hash(require('../src/native-filesystem').pathKey(o.exportRoot)).slice(7,31)+'.lock');fs.writeFileSync(lock,'{"pid":123}');const bytes=fs.readFileSync(lock);assert.equal(exportPreflight(args).lockPresent,true);assert.deepEqual(fs.readFileSync(lock),bytes);
  fs.appendFileSync(path.join(o.sourceRoot,'index.html'),'drift');assert.equal(exportPreflight(args).originalDrift,true);
  assert.equal(exportPreflight({...args,exportRoot:path.join(o.dataRoot,'unsafe')}).pathsSafe,false);
 });

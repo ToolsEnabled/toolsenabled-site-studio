@@ -1,4 +1,5 @@
 'use strict';
+const {privateMkdir,privateWrite}=require('./helpers');
 // Regression tests for the five findings of the 2026-10-13 product review of 0.1.6 (CHANGELOG 0.1.7).
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const {spawnSync}=require('node:child_process');
@@ -35,7 +36,7 @@ test('genuine self-closing slashes are still recognized',()=>{
 // 2. The newest undo state survives the 96 MiB history target; only the 128 MiB ceiling removes it, with a warning.
 test('a 24 MiB site keeps its newest undo state, and losing it to the 128 MiB ceiling is reported',{timeout:120000},t=>{
  const o=fixture(t);fs.mkdirSync(path.join(o.sourceRoot,'big'));
- for(let i=0;i<12;i++)fs.writeFileSync(path.join(o.sourceRoot,'big','blob'+i+'.bin'),crypto.randomBytes(2*1024*1024));
+ for(let i=0;i<12;i++)privateWrite(path.join(o.sourceRoot,'big','blob'+i+'.bin'),crypto.randomBytes(2*1024*1024));
  const s=createStore(o);t.after(()=>s.close());
  const edited=s.edit(textOp(s.model,'Edited'));
  assert.equal(edited.rev,1);assert.equal(edited.undoPruned,undefined);assert.equal(s.status.undo,1,'the only undo state was pruned');
@@ -76,7 +77,7 @@ test('a checkpoint cannot be labelled with the changes keyword "original"',async
 });
 test('a saved checkpoint named "original" is shown as an imported checkpoint after restart',async t=>{
  const o=fixture(t);let s=createStore(o);s.checkpoint('Saved',0);s.close();
- const file=path.join(o.dataRoot,'state.json'),state=JSON.parse(fs.readFileSync(file,'utf8'));state.checkpoints[0].label='original';fs.writeFileSync(file,JSON.stringify(state));
+ const file=path.join(o.dataRoot,'state.json'),state=JSON.parse(fs.readFileSync(file,'utf8'));state.checkpoints[0].label='original';privateWrite(file,JSON.stringify(state));
  const listed=(await view({...o,view:'checkpoints'})).rows.join('\n');assert(listed.includes('Imported checkpoint 1'),listed);assert(!/^original ·/m.test(listed),listed);
  s=createStore(o);t.after(()=>s.close());assert.deepEqual(s.status.checkpoints.map(c=>c.label),['Opened working copy (r0)','Imported checkpoint 1']);
 });
@@ -84,12 +85,12 @@ test('a saved checkpoint named "original" is shown as an imported checkpoint aft
 // 5. A first start killed during its first commit leaves working-<hex> and state.json.<hex>.tmp; the next start
 // removes them when they hold only (part of) a copy of the original, and refuses anything else as before.
 function leftovers(o,{extra=false}={}){
- fs.mkdirSync(o.dataRoot,{mode:0o700});
- const work=path.join(o.dataRoot,'working-'+crypto.randomBytes(16).toString('hex'));fs.mkdirSync(path.join(work,'nested'),{recursive:true,mode:0o700});
- fs.writeFileSync(path.join(work,'styles.css'),fs.readFileSync(path.join(o.sourceRoot,'styles.css')));
- fs.writeFileSync(path.join(work,'index.html'),fs.readFileSync(path.join(o.sourceRoot,'index.html')).subarray(0,20));
- if(extra)fs.writeFileSync(path.join(work,'nested','notes.txt'),'user content');
- const temp=path.join(o.dataRoot,'state.json.'+crypto.randomBytes(8).toString('hex')+'.tmp');fs.writeFileSync(temp,'{"version":1,"fingerprintVersion":2,"sourceRo');
+ privateMkdir(o.dataRoot,{mode:0o700});
+ const work=path.join(o.dataRoot,'working-'+crypto.randomBytes(16).toString('hex'));privateMkdir(path.join(work,'nested'),{recursive:true,mode:0o700});
+ privateWrite(path.join(work,'styles.css'),fs.readFileSync(path.join(o.sourceRoot,'styles.css')));
+ privateWrite(path.join(work,'index.html'),fs.readFileSync(path.join(o.sourceRoot,'index.html')).subarray(0,20));
+ if(extra)privateWrite(path.join(work,'nested','notes.txt'),'user content');
+ const temp=path.join(o.dataRoot,'state.json.'+crypto.randomBytes(8).toString('hex')+'.tmp');privateWrite(temp,'{"version":1,"fingerprintVersion":2,"sourceRo');
  return {work,temp};
 }
 function captureStderr(t){const lines=[],write=process.stderr.write;process.stderr.write=function(chunk,...rest){lines.push(String(chunk));return write.call(this,chunk,...rest);};t.after(()=>{process.stderr.write=write;});return lines;}
@@ -109,7 +110,7 @@ test('a working folder that is not a copy of the original still blocks startup a
  const p=fixture(t),saved=leftovers(p);fs.rmSync(saved.work,{recursive:true});
  const s=createStore(p);s.edit(textOp(s.model));s.checkpoint('Edited',1);s.close();
  // A complete temporary state that already holds edits is not a first-start leftover.
- const other=fixture(t);fs.mkdirSync(other.dataRoot,{mode:0o700});const copy=path.join(other.dataRoot,'state.json.0123456789abcdef.tmp');
- fs.copyFileSync(path.join(p.dataRoot,'state.json'),copy);
+ const other=fixture(t);privateMkdir(other.dataRoot,{mode:0o700});const copy=path.join(other.dataRoot,'state.json.0123456789abcdef.tmp');
+ privateWrite(copy,fs.readFileSync(path.join(p.dataRoot,'state.json')));
  assert.throws(()=>createStore(other),/state root must be an empty dedicated directory/);assert(fs.existsSync(copy));
 });

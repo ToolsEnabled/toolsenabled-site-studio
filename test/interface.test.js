@@ -47,7 +47,8 @@ test('guard denies all direct writes, shell, network, model tools and malformed 
 
 test('five registration helpers handle spaces and shell metacharacters without writing config', async () => {
   const {clientConfig} = await import('../tools/mcp-config.mjs');
-  const opts = {site:'/tmp/example site/$(no-command)',dataDir:'/tmp/state space',exportDir:'/tmp/export space',node:'/path with space/node',appRoot:'/plugin space'};
+  const drive=process.platform==='win32'?'C:':'';
+  const opts = {site:drive+'/tmp/example site/$(no-command)',dataDir:drive+'/tmp/state space',exportDir:drive+'/tmp/export space',node:drive+'/path with space/node',appRoot:drive+'/plugin space'};
   for (const client of ['claude','codex','cursor','claude-desktop','deepseek']) {
     const output = clientConfig(client,opts);
     assert.match(output,/site-studio/); assert.match(output,/mcp-web\.js/);
@@ -55,7 +56,7 @@ test('five registration helpers handle spaces and shell metacharacters without w
       const row = JSON.parse(output).mcpServers['site-studio'];
       assert.equal(row.command,opts.node); assert.equal(row.args[2],opts.site);
     } else if (client === 'deepseek') assert.match(output,/@deepseek-ai\/dsh-mcp-client/);
-    else assert.match(output,/'\/tmp\/example site\/\$\(no-command\)'/);
+    else assert(output.includes("'"+opts.site+"'"),output);
   }
   assert.throws(()=>clientConfig('invalid'),/Usage/);
   for (const key of ['site','dataDir','exportDir','appRoot']) for (const value of ['~','~/x','relative','']) assert.throws(()=>clientConfig('codex',{[key]:value}),/absolute path/);

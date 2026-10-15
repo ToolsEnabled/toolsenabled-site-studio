@@ -1,4 +1,5 @@
 'use strict';
+const {privateWrite}=require('./helpers');
 const test=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const path=require('node:path');const {fixture,saveEvidence}=require('./helpers');const {start,runOnce}=require('./mcp-helper');
 test('stdio golden tools/list and two-page edit checkpoint undo export lifecycle',async t=>{
   const o=fixture(t),original=fs.readFileSync(path.join(o.sourceRoot,'index.html')),child=start(o);t.after(()=>child.stop());
@@ -33,9 +34,9 @@ test('stdio validates protocol and tool arguments, refuses stale edits and settl
  assert.equal((await c.rpc('tools/call',{name:'web_read',arguments:{file_id:p.files.find(f=>f.kind==='asset').id}})).result.isError,true);
  const calls=Array.from({length:10},()=>c.rpc('tools/call',{name:'web_timeline',arguments:{}}));const end=c.stop();await Promise.all(calls);assert.deepEqual(await end,{code:0,signal:null});
 });
-test('actual MCP/MCP and browser/MCP process contention, signals release lease',async t=>{
- for(const entry of ['mcp-web.js','web-server.js']){const o=fixture(t);const first=start(o,entry);t.after(()=>first.stop());if(entry==='mcp-web.js')await first.init();else {for(let i=0;i<100&&!first.stderr.includes('http://');i++)await new Promise(r=>setTimeout(r,10));assert.match(first.stderr,/http:\/\//);}
- const second=start(o);const result=await second.exited;assert.equal(result.code,1);assert.match(second.stderr,/lease/);first.child.kill('SIGTERM');assert.deepEqual(await first.exited,{code:0,signal:null});assert.equal(fs.existsSync(path.join(o.dataRoot,'lease.json')),false);const third=start(o);await third.init();await third.stop();}
+test('actual process contention, graceful MCP EOF or POSIX signals, and forced-owner recovery',async t=>{
+ for(const entry of ['mcp-web.js','web-server.js']){const o=fixture(t);const first=start(o,entry);t.after(()=>first.stop());if(entry==='mcp-web.js')await first.init();else {const deadline=Date.now()+(process.platform==='win32'?30000:1000);while(!first.stderr.includes('http://')&&Date.now()<deadline)await new Promise(r=>setTimeout(r,10));assert.match(first.stderr,/http:\/\//);}
+ const second=start(o);const result=await second.exited;assert.equal(result.code,1);assert.match(second.stderr,/lease/);if(process.platform==='win32'){if(entry==='mcp-web.js')await first.stop();else {first.child.kill('SIGKILL');await first.exited;const recovered=start(o);await recovered.init();await recovered.stop();}}else first.child.kill('SIGTERM');if(process.platform!=='win32'||entry==='mcp-web.js')assert.deepEqual(await first.exited,{code:0,signal:null});assert.equal(fs.existsSync(path.join(o.dataRoot,'lease.json')),false);const third=start(o);await third.init();await third.stop();}
 });
 
 test('a killed MCP owner is recovered automatically with its saved state',async t=>{
@@ -53,7 +54,7 @@ test('a live lease owner is preserved and a reused PID does not retain its lease
  const o=fixture(t),first=start(o);t.after(()=>first.stop());await first.init();const file=path.join(o.dataRoot,'lease.json'),before=fs.readFileSync(file);
  const second=start(o);assert.equal((await second.exited).code,1);assert.match(second.stderr,/lease.*alive/i);assert.deepEqual(fs.readFileSync(file),before);
  first.child.kill('SIGKILL');await first.exited;
- const stale=JSON.parse(before);stale.pid=process.pid;fs.writeFileSync(file,JSON.stringify(stale));
+ const stale=JSON.parse(before);stale.pid=process.pid;privateWrite(file,JSON.stringify(stale));
  const replacement=start(o);t.after(()=>replacement.stop());await replacement.init();assert.match(replacement.stderr,/Recovered stale Site Studio state lease/);assert.equal(JSON.parse(fs.readFileSync(file)).pid,replacement.child.pid);
  await replacement.stop();
 });
@@ -73,13 +74,13 @@ test('concurrent restarts recover one stale owner without admitting a second wri
 test('recovery survives an abandoned recovery claim and handles a prior-boot identity',async t=>{
  const o=fixture(t),first=start(o);await first.init();first.child.kill('SIGKILL');await first.exited;
  const file=path.join(o.dataRoot,'lease.json'),stale=JSON.parse(fs.readFileSync(file));
- fs.writeFileSync(path.join(o.dataRoot,'.lease-recovery-'+stale.nonce),JSON.stringify({...stale,nonce:'a'.repeat(32)}));
+ privateWrite(path.join(o.dataRoot,'.lease-recovery-'+stale.nonce),JSON.stringify({...stale,nonce:'a'.repeat(32)}));
  const next=start(o);t.after(()=>next.stop());await next.init();await next.stop();assert(!fs.readdirSync(o.dataRoot).some(n=>n.startsWith('.lease-')));
  if(process.platform==='linux'){
   const identity=require('../src/state-lease').processIdentity(process.pid);
-  fs.writeFileSync(file,JSON.stringify({...stale,pid:process.pid,process:{...identity,bootId:'a different boot'}}));
+  privateWrite(file,JSON.stringify({...stale,pid:process.pid,process:{...identity,bootId:'a different boot'}}));
   const reboot=start(o);t.after(()=>reboot.stop());await reboot.init();assert.match(reboot.stderr,/Recovered stale/);await reboot.stop();
  }
- fs.writeFileSync(file,JSON.stringify({pid:stale.pid,nonce:stale.nonce,entry:'site-studio'}));
+ privateWrite(file,JSON.stringify({pid:stale.pid,nonce:stale.nonce,entry:'site-studio'}));
  const legacy=start(o);assert.equal((await legacy.exited).code,1);assert.match(legacy.stderr,/Cannot verify state lease owner scope/);assert.equal(JSON.parse(fs.readFileSync(file)).pid,stale.pid);
 });

@@ -2,7 +2,7 @@
 
 This branch prepares Site Studio 0.1.11 for native Windows 10/11 x64 with Node 22+ and Windows PowerShell 5.1. It uses no WSL, MSYS or Cygwin. **Native execution is currently unqualified and gated**. The host has returned after the initial outage; this exact Site Studio candidate still needs native qualification. Do not offer it as a supported Windows release. Windows 11, an ordinary Windows token, actual DACL enforcement, hardlink/rename semantics, pane bootstrap and GUI/plugin-host behavior have not been proved.
 
-The Linux baseline is 276 passed. New Windows tests include lexical/argument checks on Linux; native-only cases explicitly skip there. Those skips are not Windows evidence. Main/tag/release/directory submissions stay unchanged.
+The corrected local Linux suite is278passed/0failed with4native-only skips (282total). The earlier native552engineering pass failed as detailed below; it is not a pass for this correction. New Windows tests include lexical/argument checks on Linux; native-only cases explicitly skip there. Those skips are not Windows evidence. Main/tag/release/directory submissions stay unchanged.
 
 ## Isolated install, after the native test host returns
 
@@ -33,6 +33,10 @@ The default Windows state location, if no explicit data folder is supplied, is t
 ## Native acceptance still required
 
 Set TEMP/TMP to a private test folder and run one job at a time. For maintainer tests, set PYTHON to the actual Python executable (packaging/test dependency only); the product runtime has no Python dependency. Windows has no Unix socket path-length limit: the test runner's Windows branch uses native path validation instead. Start with `node --test --test-concurrency=1 test/windows-native.test.js`, then the stdio lifecycle and security/store/lease/pane tests and full suite with an actual private headless Edge/Chrome path. Record exact counts and skips. Do not change Developer Mode, ACLs outside your created fixtures or machine policy.
+
+The first full native engineering pass of source552 on Windows10 build19045 recorded212pass/67fail/2skip. It exposed missing explicit current-SID creation for state JSON, lease temporaries and nested working-copy entries, plus POSIX-only fixture/environment assumptions. Those failures are retained; this corrected source still needs a fresh native pass. State, lease and working-copy creation now request the current SID explicitly even under an elevated token whose default file owner is Administrators. Existing foreign-owned private state remains refused; it is never adopted or repaired. The native custody fixture records actual owner SIDs and DACLs for the live lease, state JSON and nested working copy before checking case-alias restart.
+
+Windows tests use a real Node executable for the inert browser protocol peer, explicit local private state paths and the clean Windows OS/opt-in environment. POSIX signal/hangup cases skip with an explicit reason on Windows; native asynchronous startup-abort and MCP EOF/lifetime/recovery checks are separate. Interactive console Ctrl+Break is an owner acceptance step. Release-tool tests also need Git on PATH (runtime/install needs only Node/PowerShell); test Git configuration must be isolated.
 
 The native test also runs eight authored in-memory raw-DACL cases through the actual product assessor in Windows PowerShell 5.1. Safe read, sibling-creation and inherit-only grants must pass; active replacement grants, outside private grants and null DACLs must refuse for their stated policy reason. The helper casts enum operands to integers before bitwise operations so byte-backed `AceFlags` does not cause an invalid-cast error in PowerShell 5.1. This regression fixture does not replace actual filesystem ACL/ancestor tests.
 

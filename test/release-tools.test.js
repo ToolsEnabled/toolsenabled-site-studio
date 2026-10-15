@@ -12,9 +12,20 @@ test('handoff copies only verified inventory and detects keys inside archives an
  const p=spawnSync(process.env.PYTHON||'python3',[path.join(__dirname,'handoff-worker.py')],{encoding:'utf8',timeout:15000});assert.equal(p.status,0,p.stderr+p.stdout);
  assert.deepEqual(pycache(),before,'the handoff worker left Python bytecode in the plugin folder');
 });
-test('the test runner stops before any test when TMPDIR is relative, reached through a symbolic link or too long for Chrome',t=>{
+test('the test runner stops before tests for invalid native scratch paths',t=>{
  const fs=require('node:fs'),os=require('node:os'),{childEnv,tmpdirProblem,tmpdirLengthProblem}=require('./helpers');
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'site-studio-runner-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ if(process.platform==='win32'){
+  const missing=path.join(root,'missing');
+  for(const dir of ['relative',missing]){
+   const p=spawnSync(process.execPath,[path.join(__dirname,'../tools/run-tests.js')],{cwd:root,encoding:'utf8',timeout:15000,env:{...childEnv(),TEMP:dir,TMP:dir}});
+   assert.equal(p.status,2,p.stderr);assert.match(p.stderr,/Site Studio tests not started/);assert.doesNotMatch(p.stdout,/TAP version|# tests/);
+  }
+  const link=path.join(root,'link');fs.symlinkSync(root,link,'junction');
+  assert.match(tmpdirProblem(link),/Windows TEMP custody check failed/);
+  assert.equal(tmpdirProblem(os.tmpdir()),'');assert.equal(tmpdirLengthProblem('C:\\'+'x'.repeat(100)),'');return;
+ }
+
  fs.mkdirSync(path.join(root,'relative'));const link=path.join(root,'link');fs.symlinkSync(root,link);
  const long=path.join(root,'x'.repeat(Math.max(1,62-root.length)));fs.mkdirSync(long);const bytes=Buffer.byteLength(long);assert(bytes>62);
  const run=dir=>spawnSync(process.execPath,[path.join(__dirname,'../tools/run-tests.js')],{cwd:root,encoding:'utf8',timeout:15000,env:{...childEnv(),TMPDIR:dir}});

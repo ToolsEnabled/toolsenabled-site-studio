@@ -47,8 +47,8 @@ function within(a,b){a=native.pathKey(a);b=native.pathKey(b);return a===b||a.sta
 function writeTree(root,model) {
   checkedPath(root,{missing:true});if(fs.existsSync(root))throw Error('working tree destination already exists');native.privateDirectory(root);
   try {
-  for(const directory of allDirectories(model)){if(!safePath(directory))throw Error('unsafe directory');fs.mkdirSync(path.join(root,directory),{recursive:true,mode:0o700});}
-  for(const file of model.files){if(!safePath(file.path))throw Error('unsafe path');const dest=path.join(root,file.path);fs.mkdirSync(path.dirname(dest),{recursive:true,mode:0o700});checkedPath(dest,{missing:true});const fd=fs.openSync(dest,'wx',0o600);try{fs.writeFileSync(fd,bytes(file));fs.fsyncSync(fd);}finally{fs.closeSync(fd);}}
+  for(const directory of allDirectories(model)){if(!safePath(directory))throw Error('unsafe directory');native.privateDirectory(path.join(root,directory));}
+  for(const file of model.files){if(!safePath(file.path))throw Error('unsafe path');const dest=path.join(root,file.path);native.privateDirectory(path.dirname(dest));checkedPath(dest,{missing:true});const fd=native.privateFile(dest);try{fs.writeFileSync(fd,bytes(file));fs.fsyncSync(fd);}finally{fs.closeSync(fd);}}
   } catch(error){fs.rmSync(root,{recursive:true,force:true});throw error;}
 }
 module.exports={MAX_FILE,MAX_SITE,MAX_FILES,allDirectories,checkedPath,readRegular,importSite,importSiteSteps,bytes,fingerprint,within,writeTree};

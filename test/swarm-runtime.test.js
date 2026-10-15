@@ -1,4 +1,6 @@
 'use strict';
+const {childEnv:osChildEnv}=require('./helpers');
+const {privateMkdir,privateWrite,publicReadFixture}=require('./helpers');
 const test=require('node:test'),assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const {spawnSync}=require('node:child_process');
@@ -24,14 +26,14 @@ async function doctor(o){
 }
 function aliases(source){return [source,source+path.sep,source+path.sep+'.',source+path.sep+'nested'+path.sep+'..'];}
 function child(script,args,env){
- const r=spawnSync(process.execPath,['-e',script,...args],{encoding:'utf8',timeout:10000,
-  env:{PATH:process.env.PATH,TMPDIR:process.env.TMPDIR,...env}});
+ const r=spawnSync(process.execPath,['-e',script,...args],{encoding:'utf8',timeout:process.platform==='win32'?30000:10000,
+  env:{...osChildEnv(),...env}});
  assert.equal(r.status,0,r.stderr);assert.equal(r.signal,null);return r.stdout;
 }
-for(const mode of ['option','environment'])test('F6 default view and runtime share persisted state for '+mode+' path aliases',t=>{
+for(const mode of ['option','environment'])test('F6 '+(process.platform==='win32'?'explicit native':'default')+' view and runtime share persisted state for '+mode+' path aliases',t=>{
  const o=fixture(t),home=path.join(o.root,'home');fs.mkdirSync(home,{mode:0o700});
  const env={HOME:home},storePath=path.join(root,'src/studio-store.js'),viewPath=path.join(root,'src/site-view.js');
- const config=source=>mode==='option'?{sourceRoot:source}:{};
+ const config=source=>({...((mode==='option')?{sourceRoot:source}:{}),...(process.platform==='win32'?{dataRoot:o.dataRoot}:{})});
  const childEnv=source=>({...env,...(mode==='environment'?{SITE_STUDIO_ROOT:source}:{})});
  const started=child("const s=require(process.argv[1]).createStore(JSON.parse(process.argv[2]));s.human('pause',{expectedRev:0});s.close();console.log('runtime persisted');",
   [storePath,JSON.stringify(config(o.sourceRoot+path.sep))],childEnv(o.sourceRoot+path.sep));
@@ -62,8 +64,8 @@ test('F8 unopened doctor agrees with runtime for equivalent original export and 
 });
 
 test('F8 doctor names nonempty refusal and preserves unrelated content as runtime refuses',async t=>{
- const o=fixture(t);fs.mkdirSync(o.dataRoot,{mode:0o700});
- const file=path.join(o.dataRoot,'unrelated-private-name');fs.writeFileSync(file,'fixture content',{mode:0o600});
+ const o=fixture(t);privateMkdir(o.dataRoot,{mode:0o700});
+ const file=path.join(o.dataRoot,'unrelated-private-name');privateWrite(file,'fixture content',{mode:0o600});
  const before=tree(o.root),text=await doctor(o);
  assert(text.includes('Startup blocked: state folder is non-empty; use a dedicated empty folder.'));
  assert(!text.includes('unrelated-private-name'));assert(!text.includes('fixture content'));assert(!text.includes(o.root));
@@ -73,14 +75,14 @@ test('F8 doctor names nonempty refusal and preserves unrelated content as runtim
 });
 
 test('F8 doctor distinguishes permitted metadata from an unverifiable primary lease without repair',async t=>{
- const o=fixture(t);fs.mkdirSync(o.dataRoot,{mode:0o700});
- const claim=path.join(o.dataRoot,'.lease-recovery-'+'a'.repeat(32));fs.writeFileSync(claim,'not an owner record',{mode:0o600});
+ const o=fixture(t);privateMkdir(o.dataRoot,{mode:0o700});
+ const claim=path.join(o.dataRoot,'.lease-recovery-'+'a'.repeat(32));privateWrite(claim,'not an owner record',{mode:0o600});
  let before=tree(o.root),text=await doctor(o);
  assert(text.includes('dedicated empty folder'));assert(text.includes('Lease metadata files: 1'));assert(text.includes('Server lease: absent'));
  assert(!text.includes('not an owner record'));assert.deepEqual(tree(o.root),before);
  const store=createStore(o);store.close();assert.equal(fs.readFileSync(claim,'utf8'),'not an owner record');
- const unopened=fixture(t);fs.mkdirSync(unopened.dataRoot,{mode:0o700});
- fs.writeFileSync(path.join(unopened.dataRoot,'lease.json'),'{}',{mode:0o600});
+ const unopened=fixture(t);privateMkdir(unopened.dataRoot,{mode:0o700});
+ privateWrite(path.join(unopened.dataRoot,'lease.json'),'{}',{mode:0o600});
  before=tree(unopened.root);text=await doctor(unopened);
  assert(text.includes('Server lease: unverifiable'));assert(text.includes('No repair is performed.'));
  assert.deepEqual(tree(unopened.root),before);assert.throws(()=>createStore(unopened),/Cannot read state lease safely/);
@@ -88,10 +90,10 @@ test('F8 doctor distinguishes permitted metadata from an unverifiable primary le
 });
 
 test('F8 doctor names permission refusal and missing source/export parents without creating them',async t=>{
- const o=fixture(t);fs.mkdirSync(o.dataRoot,{mode:0o700});fs.chmodSync(o.dataRoot,0o755);
+ const o=fixture(t);privateMkdir(o.dataRoot,{mode:0o700});publicReadFixture(o.dataRoot);
  let before=tree(o.root),text=await doctor(o);
- assert(text.includes('private permissions required (0700)'));assert.deepEqual(tree(o.root),before);
- assert.throws(()=>createStore(o),/state root must have private permissions/);
+ assert(text.includes(process.platform==='win32'?'State folder: inaccessible or linked':'private permissions required (0700)'));assert.deepEqual(tree(o.root),before);
+ assert.throws(()=>createStore(o),process.platform==='win32'?/Windows private-folder check failed/:/state root must have private permissions/);
  const bad={...o,sourceRoot:path.join(o.root,'absent-site'),dataRoot:path.join(o.root,'absent-state'),exportRoot:path.join(o.root,'absent-parent','export')};
  before=tree(o.root);text=await doctor(bad);
  assert(text.includes('Site folder: missing or inaccessible'));assert(text.includes('Export parent: missing or inaccessible'));
@@ -117,7 +119,7 @@ test('F8 saved-state doctor remains read-only and names wrong binding and policy
  let before=tree(o.root),text=await doctor(o);assert(text.includes('state binding verified'));assert.deepEqual(tree(o.root),before);
  const stateFile=path.join(o.dataRoot,'state.json'),state=JSON.parse(fs.readFileSync(stateFile,'utf8'));
  for(const [field,value,message] of [['sourceRoot',o.root,'Saved state belongs to another configured site.'],['allowExternal',true,'External-reference policy mismatch']]){
-  fs.writeFileSync(stateFile,JSON.stringify({...state,[field]:value}));before=tree(o.root);text=await doctor(o);
+  privateWrite(stateFile,JSON.stringify({...state,[field]:value}));before=tree(o.root);text=await doctor(o);
   assert(text.includes(message));assert(text.includes('No repair is performed.'));assert(!text.includes(o.root));
   assert(!text.includes('not opened yet'),'saved-state refusal must not claim an unopened working copy');
   assert(!text.includes('state folder is non-empty'),'existing saved state is not an unopened-directory refusal');
@@ -142,8 +144,8 @@ test('F8 saved-source doctor explicitly refuses hard links, invalid UTF-8 and si
  for(const variant of ['hard link','invalid UTF-8','oversize']){
   const o=fixture(t),config={...o,...(variant==='invalid UTF-8'?{exportRoot:undefined}:{})},store=createStore(config);store.close();
   if(variant==='hard link')fs.linkSync(path.join(o.sourceRoot,'index.html'),path.join(o.sourceRoot,'private-linked-name'));
-  if(variant==='invalid UTF-8')fs.writeFileSync(path.join(o.sourceRoot,'styles.css'),Buffer.from([0xff]));
-  if(variant==='oversize')fs.writeFileSync(path.join(o.sourceRoot,'styles.css'),Buffer.alloc(2*1024*1024+1,32));
+  if(variant==='invalid UTF-8')privateWrite(path.join(o.sourceRoot,'styles.css'),Buffer.from([0xff]));
+  if(variant==='oversize')privateWrite(path.join(o.sourceRoot,'styles.css'),Buffer.alloc(2*1024*1024+1,32));
   const before=tree(o.root),text=await doctor(config);
   assert(text.includes('Source import: refused by static-site validation'),variant+' must name a real refusal');
   assert(text.includes('Original drift: unverifiable'),variant+' must not claim a completed drift check');

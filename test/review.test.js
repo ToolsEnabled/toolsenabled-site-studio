@@ -26,7 +26,7 @@ test('closed MCP schemas refuse inherited property names',()=>{
  }
 });
 
-for(const entry of ['mcp-web.js','web-server.js'])test(entry+' releases its lease on terminal hangup',async t=>{
+for(const entry of ['mcp-web.js','web-server.js'])test(entry+' releases its lease on terminal hangup',{skip:process.platform==='win32'?'POSIX hangup; native MCP EOF is exercised, console Ctrl+Break is an owner check':false},async t=>{
  const fs=require('node:fs');const {fixture}=require('./helpers');const {start}=require('./mcp-helper');const o=fixture(t);const m=start(o,entry);t.after(async()=>{if(m.child.exitCode===null&&m.child.signalCode===null)m.child.kill('SIGKILL');await m.exited;});
  const deadline=Date.now()+5000;while(!m.stderr.includes('dashboard session:')&&Date.now()<deadline)await new Promise(r=>setTimeout(r,10));assert.match(m.stderr,/dashboard session:/);
  m.child.kill('SIGHUP');assert.deepEqual(await m.exited,{code:0,signal:null});assert(!fs.existsSync(path.join(o.dataRoot,'lease.json')));

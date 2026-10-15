@@ -4,7 +4,7 @@ const root=path.join(__dirname,'..');
 function bounded(script,timeout=2500){const r=spawnSync(process.execPath,['-e',script],{cwd:root,timeout,encoding:'utf8',env:childEnv()});assert.equal(r.error,undefined,r.error?.message);assert.equal(r.status,0,r.stderr);}
 // The two preview-cache checks that serve pages over loopback HTTP run from test/preview-cache-worker.js, so no inline
 // program here makes a request; same child, deadline and environment as bounded().
-function boundedWorker(name,timeout=2500){const r=spawnSync(process.execPath,[path.join(__dirname,'preview-cache-worker.js'),name],{cwd:root,timeout,encoding:'utf8',env:childEnv()});assert.equal(r.error,undefined,r.error?.message);assert.equal(r.status,0,r.stderr);}
+function boundedWorker(name,timeout=process.platform==='win32'?30000:2500){const r=spawnSync(process.execPath,[path.join(__dirname,'preview-cache-worker.js'),name],{cwd:root,timeout,encoding:'utf8',env:childEnv()});assert.equal(r.error,undefined,r.error?.message);assert.equal(r.status,0,r.stderr);}
 test('CSS writes and removals scan large separator runs within a time budget',()=>{
  bounded(`const {applyOp}=require('./src/web-model');const assert=require('node:assert/strict');
  for(const separator of ['\\n','\\r\\n',' \\n','\\u2028']){
@@ -38,7 +38,7 @@ test('an edit only indexes its changed HTML file',()=>{
  const doc={rev:0,root:'site',files:[{id:'a',path:'a.html',kind:'html',source,nodes:model.indexHtml(source)},{id:'b',path:'b.html',kind:'html',source:other,nodes:[]}]};
  safe.tokenize=s=>{assert.notEqual(s,other,'unchanged file was indexed');return original(s);};try{assert.equal(model.applyOp(doc,{type:'set_text',expectedRev:0,fileId:'a',nodeId:'n_0',baseHash:model.hash(source),text:'New'}).rev,1);}finally{safe.tokenize=original;}
 });
-for(const entry of ['mcp-web.js','web-server.js'])test(entry+' cancels startup import and releases its lease on SIGTERM',async t=>{
+for(const entry of ['mcp-web.js','web-server.js'])test(entry+' cancels startup import and releases its lease on SIGTERM',{skip:process.platform==='win32'?'POSIX delivery; native AbortSignal cancellation and MCP EOF are exercised separately':false},async t=>{
  const fs=require('node:fs');const {fixture}=require('./helpers');const {start}=require('./mcp-helper');const o=fixture(t);const n=Math.floor(2*1024*1024/9);const source='<div>'.repeat(n)+'</p>'.repeat(n);for(let i=0;i<8;i++)fs.writeFileSync(path.join(o.sourceRoot,'dense'+i+'.html'),source);
  const m=start(o,entry);t.after(async()=>{if(m.child.exitCode===null&&m.child.signalCode===null)m.child.kill('SIGKILL');await m.exited;});const lease=path.join(o.dataRoot,'lease.json');const end=Date.now()+5000;while(!fs.existsSync(lease)&&Date.now()<end)await new Promise(r=>setTimeout(r,2));assert(fs.existsSync(lease));assert(!m.stderr.includes('dashboard session:'));
  m.child.kill('SIGTERM');let timer;try{assert.deepEqual(await Promise.race([m.exited,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('startup cancellation exceeded 2500 ms')),2500);})]),{code:0,signal:null});}finally{clearTimeout(timer);}assert(!fs.existsSync(lease));
@@ -73,9 +73,9 @@ test('case-insensitive search reports original UTF-16 offsets within a time budg
 });
 
 test('browser harness keeps zygote enabled unless sandbox disabling is explicit',async t=>{
- const fs=require('node:fs');const {fixture}=require('./helpers');const o=fixture(t);const fake=path.join(o.root,'fake-chrome'),record=path.join(o.root,'flags.json');
+ const fs=require('node:fs');const {fixture}=require('./helpers');const o=fixture(t);const fake=path.join(o.root,'fake-chrome.cjs'),record=path.join(o.root,'flags.json');
  fs.writeFileSync(fake,'#!/usr/bin/env node\n'+`const fs=require('node:fs');fs.writeFileSync(${JSON.stringify(record)},JSON.stringify(process.argv.slice(2)));let input='';const stream=fs.createReadStream(null,{fd:3});stream.on('data',b=>{input+=b;let at;while((at=input.indexOf('\\0'))>=0){const msg=JSON.parse(input.slice(0,at));input=input.slice(at+1);const result=msg.method==='Target.createTarget'?{targetId:'target'}:msg.method==='Target.attachToTarget'?{sessionId:'session'}:{};fs.writeSync(4,JSON.stringify({id:msg.id,result})+'\\0');if(msg.method==='Browser.close')process.exit(0);}});`);fs.chmodSync(fake,0o700);
- for(const off of ['0','1']){const b=await require('./browser-helper').browser({SITE_STUDIO_CHROME:fake,SITE_STUDIO_CHROME_NO_SANDBOX:off});try{const flags=JSON.parse(fs.readFileSync(record));assert.equal(flags.includes('--no-sandbox'),off==='1');assert.equal(flags.includes('--no-zygote'),off==='1');}finally{await b.close();}}
+ for(const off of ['0','1']){const b=await require('./browser-helper').browser({SITE_STUDIO_CHROME:process.execPath,executableArgs:[fake],SITE_STUDIO_CHROME_NO_SANDBOX:off});try{const flags=JSON.parse(fs.readFileSync(record));assert.equal(flags.includes('--no-sandbox'),off==='1');assert.equal(flags.includes('--no-zygote'),off==='1');}finally{await b.close();}}
 });
 
 test('preview strips referrer overrides from HTML, malformed tags and SVG',()=>{

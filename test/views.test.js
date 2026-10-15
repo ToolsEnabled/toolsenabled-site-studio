@@ -1,10 +1,11 @@
 'use strict';
+const {childEnv:osChildEnv}=require('./helpers');
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const {spawnSync}=require('node:child_process');
 const {fixture,textOp}=require('./helpers');
 const {createStore}=require('../src/studio-store');
 const cli=path.join(__dirname,'../tools/site-studio-view.js');
-function run(o,view='home',extra=[]){return spawnSync(process.execPath,[cli,view,'--site',o.sourceRoot,'--data-dir',o.dataRoot,'--json',...extra],{encoding:'utf8',timeout:5000,env:{PATH:process.env.PATH}});}
+function run(o,view='home',extra=[]){return spawnSync(process.execPath,[cli,view,'--site',o.sourceRoot,'--data-dir',o.dataRoot,'--json',...extra],{encoding:'utf8',timeout:process.platform==='win32'?30000:5000,env:osChildEnv()});}
 function good(o,view,extra){const p=run(o,view,extra);assert.equal(p.status,0,p.stderr);return JSON.parse(p.stdout);}
 test('views read live and stopped working copies without writing or taking a lease',t=>{
  const o=fixture(t),store=createStore(o);t.after(()=>store.close());store.edit(textOp(store.model));store.checkpoint('First',1);
@@ -24,7 +25,7 @@ test('paging pins the whole snapshot including same-revision pause and checkpoin
 });
 test('views refuse missing configuration, wrong bindings, linked and oversized state, without creating files',t=>{
  const o=fixture(t);assert.equal(run(o).status,0);assert(!fs.existsSync(o.dataRoot));
- const missing=spawnSync(process.execPath,[cli,'home','--data-dir',''],{encoding:'utf8',env:{},timeout:5000});assert.equal(missing.status,1);assert.match(missing.stderr,/VIEW_CONFIG/);
+ const missing=spawnSync(process.execPath,[cli,'home','--data-dir',''],{encoding:'utf8',env:{},timeout:process.platform==='win32'?30000:5000});assert.equal(missing.status,1);assert.match(missing.stderr,/VIEW_CONFIG/);
  const store=createStore(o);store.close();const file=path.join(o.dataRoot,'state.json'),state=fs.readFileSync(file);let data=JSON.parse(state);data.sourceRoot=o.root;fs.writeFileSync(file,JSON.stringify(data));assert.match(run(o).stderr,/VIEW_BINDING/);
  fs.unlinkSync(file);const target=path.join(o.root,'target.json');fs.writeFileSync(target,state);fs.symlinkSync(target,file);assert.match(run(o).stderr,/VIEW_STATE/);fs.unlinkSync(file);fs.linkSync(target,file);assert.match(run(o).stderr,/VIEW_STATE/);fs.unlinkSync(file);
  fs.writeFileSync(file,'');fs.truncateSync(file,128*1024*1024+1);assert.match(run(o).stderr,/VIEW_STATE/);
@@ -41,7 +42,7 @@ test('view input is bounded, strictly parsed and shell metacharacters remain lit
  assert.equal(run(o,'export; touch owned').status,1);assert(!fs.existsSync(path.join(o.root,'owned')));
 });
 test('help works before configuration and terminal sanitization covers Unicode format controls',async()=>{
- const p=spawnSync(process.execPath,[cli,'help'],{encoding:'utf8',env:{},timeout:5000});assert.equal(p.status,0,p.stderr);assert.match(p.stdout,/site-studio home/);assert.match(p.stdout,/Next page/);
+ const p=spawnSync(process.execPath,[cli,'help'],{encoding:'utf8',env:{},timeout:process.platform==='win32'?30000:5000});assert.equal(p.status,0,p.stderr);assert.match(p.stdout,/site-studio home/);assert.match(p.stdout,/Next page/);
  const {safeText}=await import('../hooks/view-contract.mjs');
  for(let n=0;n<=0x10ffff;n++){
   const c=String.fromCodePoint(n);if(/[\p{Cc}\p{Cf}\p{Default_Ignorable_Code_Point}\p{Zl}\p{Zp}]/u.test(c))assert.equal(safeText(c),'�','U+'+n.toString(16));

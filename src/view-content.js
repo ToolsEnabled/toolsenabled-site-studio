@@ -71,7 +71,7 @@ function unopenedDoctor({sourceRoot,dataRoot,exportRoot,unopened=true}){
    const stat=fs.lstatSync(dataRoot);
    if(!stat.isDirectory())rows.push('State folder: not a directory.');
    else if(process.platform!=='win32'&&(stat.mode&0o077))rows.push('State folder: private permissions required (0700).');
-   else if(!unopened){stateSafe=true;rows.push('State folder: private directory; saved contents not inspected.');}
+   else if(!unopened){require('./native-filesystem').privateDirectory(dataRoot,{existing:true,tree:true});stateSafe=true;rows.push('State folder: private directory; saved contents not inspected.');}
    else{
     stateSafe=true;let other=0,metadata=0,leftovers=0,seen=0,entry;const dir=fs.opendirSync(dataRoot);
     try{while((entry=dir.readSync())!==null&&seen++<1000){if(entry.name==='lease.json'||RX.leaseMetadata.test(entry.name))metadata++;else if(RX.generation.test(entry.name)&&entry.isDirectory()||RX.stateTemp.test(entry.name)&&entry.isFile())leftovers++;else other++;}}

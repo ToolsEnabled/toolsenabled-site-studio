@@ -27,13 +27,24 @@ test('Windows PowerShell 5.1 raw ACL assessor accepts safe grants and refuses re
   const r=require('node:child_process').spawnSync('C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',['-NoLogo','-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',path.join(__dirname,'windows-acl-flags.test.ps1'),'-ProbeDirectory',root],{encoding:'utf8',timeout:20000,windowsHide:true});
   assert.equal(r.status,0,r.stderr);const receipt=JSON.parse(r.stdout);assert.equal(receipt.passed,8);assert.equal(receipt.failed,0);assert.equal(receipt.powershellMajor,5);
 });
-test('native private state survives case-alias restart and refuses a hard-linked source',{skip:process.platform!=='win32'},t=>{
+test('native private state has current-SID custody, survives case-alias restart and refuses a hard-linked source',{skip:process.platform!=='win32'},async t=>{
   process.env.SITE_STUDIO_WINDOWS_CANDIDATE='1';
   const root=path.join(require('node:os').tmpdir(),'site-studio-native-'+require('node:crypto').randomBytes(8).toString('hex'));
   native.privateDirectory(root);t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
-  const sourceRoot=path.join(root,'source'),dataRoot=path.join(root,'state');fs.mkdirSync(sourceRoot);fs.writeFileSync(path.join(sourceRoot,'index.html'),'<h1>Native</h1>');
-  const {createStore}=require('../src/studio-store'),first=createStore({sourceRoot,dataRoot});first.close();
+  const sourceRoot=path.join(root,'source'),dataRoot=path.join(root,'state');fs.mkdirSync(path.join(sourceRoot,'nested'),{recursive:true});fs.writeFileSync(path.join(sourceRoot,'index.html'),'<h1>Native</h1>');fs.writeFileSync(path.join(sourceRoot,'nested','other.html'),'<p>Nested</p>');
+  const {createStore}=require('../src/studio-store'),first=createStore({sourceRoot,dataRoot});t.after(()=>first.close());
+  const result=require('node:child_process').spawnSync(path.win32.join(process.env.SystemRoot,'System32','WindowsPowerShell','v1.0','powershell.exe'),['-NoLogo','-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',path.join(__dirname,'windows-state-custody.ps1'),'-DataDirectory',dataRoot],{encoding:'utf8',timeout:20000,windowsHide:true,env:require('./helpers').childEnv()});
+  assert.equal(result.status,0,result.stderr);const custody=JSON.parse(result.stdout);assert(custody.count>=6);assert(custody.records.some(r=>r.relativePath==='\\lease.json'));assert(custody.records.some(r=>r.relativePath==='\\state.json'));assert(custody.records.some(r=>r.relativePath.endsWith('\\nested\\other.html')));
+  await require('./helpers').saveEvidence(e=>e.write('windows/current-sid-state-custody.json',JSON.stringify(custody,null,2)+'\n'));
+  first.close();
   const second=createStore({sourceRoot:sourceRoot.toUpperCase(),dataRoot:dataRoot.toUpperCase()});second.close();
   fs.linkSync(path.join(sourceRoot,'index.html'),path.join(root,'alias.html'));
   assert.throws(()=>createStore({sourceRoot,dataRoot}),/hard link/);
+});
+test('native asynchronous startup abort releases the acquired lease',{skip:process.platform!=='win32'},async t=>{
+  const o=require('./helpers').fixture(t),controller=new AbortController();
+  const dense='<p>'.repeat(150000)+'</x>'.repeat(150000);fs.writeFileSync(path.join(o.sourceRoot,'dense.html'),dense);
+  let sawLease=false;const timer=setInterval(()=>{if(fs.existsSync(path.join(o.dataRoot,'lease.json'))){sawLease=true;controller.abort();}},1);t.after(()=>clearInterval(timer));
+  await assert.rejects(require('../src/studio-store').createStoreAsync(o,controller.signal),e=>e.name==='AbortError');
+  clearInterval(timer);assert(sawLease);assert(!fs.existsSync(path.join(o.dataRoot,'lease.json')));
 });
