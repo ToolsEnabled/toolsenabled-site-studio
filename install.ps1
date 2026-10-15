@@ -49,12 +49,21 @@ foreach($line in Get-Content -LiteralPath $manifest){
 }
 [void](Native-Operation 'directory' $Prefix)
 [void](Native-Operation 'directory' $DataDirectory)
-foreach($relative in $files){
- $target=Join-Path $Prefix $relative;$parent=Split-Path -Parent $target
- [void][IO.Directory]::CreateDirectory($parent)
- Copy-Item -LiteralPath (Join-Path $source $relative) -Destination $target
+function Copy-Private([string]$inputFile,[string]$target){
+ # An elevated token can default new Copy-Item/mkdir entries to BA ownership.
+ # Create with explicit current-SID security, then write the new file in place.
+ [void](Native-Operation 'directory' (Split-Path -Parent $target))
+ [void](Native-Operation 'file' $target)
+ $inputStream=[IO.File]::OpenRead($inputFile)
+ try{
+  $outputStream=[IO.File]::Open($target,[IO.FileMode]::Open,[IO.FileAccess]::Write,[IO.FileShare]::None)
+  try{$inputStream.CopyTo($outputStream);$outputStream.Flush($true)}finally{$outputStream.Dispose()}
+ }finally{$inputStream.Dispose()}
 }
-Copy-Item -LiteralPath $manifest -Destination (Join-Path $Prefix 'MANIFEST.sha256')
+foreach($relative in $files){
+ Copy-Private (Join-Path $source $relative) (Join-Path $Prefix $relative)
+}
+Copy-Private $manifest (Join-Path $Prefix 'MANIFEST.sha256')
 [void](Native-Operation 'inspect-tree' $Prefix)
 [void](Native-Operation 'inspect-tree' $DataDirectory)
 'Installed an UNQUALIFIED native Windows candidate. No host settings changed. Keep all test evidence.'

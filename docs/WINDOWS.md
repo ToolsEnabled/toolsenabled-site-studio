@@ -21,7 +21,7 @@ Set-Location '.\site-studio-source\site-studio'
 
 The source folder must already exist. Program and state folders must be new. A failed attempt retains new folders for inspection; choose new paths rather than deleting evidence. `install.ps1` is also directly callable from PowerShell with the same parameters. No administrator privilege, policy change, reboot, package install or host-setting edit is intended. The explicit candidate switch is required while qualification is pending. Installer and state operations need the normal current user; an elevated-only pass is insufficient.
 
-The installer verifies every checksum-listed payload member, atomically creates private directories with protected inheritable current-SID/SYSTEM/Administrators DACLs, copies the program and prints an absolute stdio MCP entry. It creates no server, browser or model. The printed entry deliberately omits export, so nothing can export until you add an explicit `--export-dir` whose parent exists. Register only in your test client configuration. For a direct terminal run:
+The installer verifies every checksum-listed payload member, creates each new program directory and file with explicit current-SID ownership and protected current-SID/SYSTEM/Administrators DACLs, copies bytes through the newly created file's stream and prints an absolute stdio MCP entry. It creates no server, browser or model. The printed entry deliberately omits export, so nothing can export until you add an explicit `--export-dir` whose parent exists. Register only in your test client configuration. For a direct terminal run:
 
 ```powershell
 $env:SITE_STUDIO_WINDOWS_CANDIDATE='1'
