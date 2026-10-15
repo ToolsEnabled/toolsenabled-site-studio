@@ -27,8 +27,27 @@ test('views refuse missing configuration, wrong bindings, linked and oversized s
  const o=fixture(t);assert.equal(run(o).status,0);assert(!fs.existsSync(o.dataRoot));
  const missing=spawnSync(process.execPath,[cli,'home','--data-dir',''],{encoding:'utf8',env:{},timeout:process.platform==='win32'?30000:5000});assert.equal(missing.status,1);assert.match(missing.stderr,/VIEW_CONFIG/);
  const store=createStore(o);store.close();const file=path.join(o.dataRoot,'state.json'),state=fs.readFileSync(file);let data=JSON.parse(state);data.sourceRoot=o.root;fs.writeFileSync(file,JSON.stringify(data));assert.match(run(o).stderr,/VIEW_BINDING/);
- fs.unlinkSync(file);const target=path.join(o.root,'target.json');fs.writeFileSync(target,state);fs.symlinkSync(target,file);assert.match(run(o).stderr,/VIEW_STATE/);fs.unlinkSync(file);fs.linkSync(target,file);assert.match(run(o).stderr,/VIEW_STATE/);fs.unlinkSync(file);
+ fs.unlinkSync(file);const target=path.join(o.root,'target.json');fs.writeFileSync(target,state);fs.linkSync(target,file);assert.match(run(o).stderr,/VIEW_STATE/);fs.unlinkSync(file);
  fs.writeFileSync(file,'');fs.truncateSync(file,128*1024*1024+1);assert.match(run(o).stderr,/VIEW_STATE/);
+});
+
+test('views refuse a file symlink when the account can create that fixture',t=>{
+ const o=fixture(t),store=createStore(o);store.close();
+ const file=path.join(o.dataRoot,'state.json'),state=fs.readFileSync(file),target=path.join(o.root,'target.json');
+ fs.unlinkSync(file);fs.writeFileSync(target,state);
+ try{fs.symlinkSync(target,file);}catch(error){
+  if(process.platform==='win32'&&error.code==='EPERM'){t.skip('Actual Windows file-symlink creation refused EPERM under this token; leaf refusal is not qualified');return;}
+  throw error;
+ }
+ const result=run(o);assert.equal(result.status,1,result.stdout);assert.match(result.stderr,/VIEW_STATE/);
+ assert.deepEqual(fs.readFileSync(target),state);
+});
+test('Windows views refuse a real directory junction without changing private saved state',{skip:process.platform!=='win32'},t=>{
+ const o=fixture(t),store=createStore(o);store.close();
+ const file=path.join(o.dataRoot,'state.json'),before=fs.readFileSync(file),names=fs.readdirSync(o.dataRoot),junction=path.join(o.root,'junction-state');
+ fs.symlinkSync(o.dataRoot,junction,'junction');assert.equal(fs.lstatSync(junction).isSymbolicLink(),true);
+ const result=run({...o,dataRoot:junction});assert.equal(result.status,1,result.stdout);assert.match(result.stderr,/VIEW_STATE/);
+ assert.deepEqual(fs.readFileSync(file),before);assert.deepEqual(fs.readdirSync(o.dataRoot),names);
 });
 test('view output sanitizes terminal controls and never exposes source, capability fields or arbitrary errors',t=>{
  const o=fixture(t),store=createStore(o);store.close();const file=path.join(o.dataRoot,'state.json'),s=JSON.parse(fs.readFileSync(file));
