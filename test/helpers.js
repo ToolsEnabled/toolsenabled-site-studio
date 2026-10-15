@@ -20,7 +20,7 @@ function textOp(model, text='Changed') {
 // temporary-folder variables (TMPDIR; TEMP and TMP on Windows), on Windows SystemRoot, which the
 // server's process check needs, and any variable the caller names (the browser needs HOME).
 // Nothing else from the runner's environment.
-const CHILD_ENV = ['PATH', 'TMPDIR', 'TEMP', 'TMP', 'SystemRoot'];
+const CHILD_ENV = ['PATH', 'TMPDIR', 'TEMP', 'TMP', 'SystemRoot', ...(process.platform==='win32'?['SITE_STUDIO_WINDOWS_CANDIDATE']:[])];
 function childEnv(...more) {
   const env = {};
   for (const name of [...CHILD_ENV, ...more]) if (process.env[name] !== undefined) env[name] = process.env[name];
@@ -45,6 +45,7 @@ async function saveEvidence(save) {
 // "read ECONNRESET".
 const TMPDIR_MAX_BYTES = 62;
 function tmpdirLengthProblem(dir = os.tmpdir()) {
+  if(process.platform==='win32')return ''; // No AF_UNIX Chrome lock socket on native Windows.
   const bytes = Buffer.byteLength(dir);
   if (bytes <= TMPDIR_MAX_BYTES) return '';
   return `TMPDIR is ${bytes} bytes long (${dir}); the browser tests need at most ${TMPDIR_MAX_BYTES}. Chrome puts its lock socket in a folder under TMPDIR, and with a longer TMPDIR that socket path exceeds the Unix limit, so Chrome exits and the browser tests fail with "read ECONNRESET". Use a short folder, for example TMPDIR=/tmp/ss.`;
@@ -53,6 +54,10 @@ function tmpdirProblem(dir = os.tmpdir()) {
   if (!path.isAbsolute(dir)) return `TMPDIR must be an absolute path; "${dir}" is relative. Set TMPDIR to the absolute real path of an existing folder, for example TMPDIR=/tmp/ss.`;
   let real;
   try { real = fs.realpathSync.native(dir); } catch (e) { return `TMPDIR (${dir}) cannot be used: ${e.code || e.message}. Set TMPDIR to an existing folder.`; }
+  if (process.platform==='win32') {
+    try { require('../src/native-filesystem').windowsLocalPath(dir);require('../src/native-filesystem').inspectWindowsPath(dir); } catch(e) { return 'Windows TEMP custody check failed: '+e.message; }
+    return '';
+  }
   if (real !== dir) return `TMPDIR must be its folder's real path: ${dir} resolves to ${real} (through a symbolic link, or . or .. parts). The working-copy store refuses paths that go through a symbolic link, by design. Use TMPDIR=${real}.`;
   return tmpdirLengthProblem(dir);
 }

@@ -8,10 +8,11 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const {spawnSync}=require('node:child_process');
 const {fixture}=require('./helpers'),{createStore}=require('../src/studio-store');
 const root=path.join(__dirname,'..');
-const CANARIES=['ANTHROPIC_API_KEY','CLAUDE_CODE_MESSAGING_TOKEN','CLAUDE_CODE_MESSAGING_SOCKET','CLAUDE_CODE_OAUTH_TOKEN','GITHUB_TOKEN','AWS_SECRET_ACCESS_KEY','SITE_STUDIO_ENV_CANARY'];
+const CANARIES=['ANTHROPIC_API_KEY','CLAUDE_CODE_MESSAGING_TOKEN','CLAUDE_CODE_MESSAGING_SOCKET','CLAUDE_CODE_OAUTH_TOKEN','GITHUB_TOKEN','AWS_SECRET_ACCESS_KEY','SITE_STUDIO_ENV_CANARY','NODE_OPTIONS','NODE_PATH'];
 // What the client process holds: its PATH and home plus synthetic credential-shaped values.
 function clientEnv(){
- const env={PATH:process.env.PATH||'/usr/local/bin:/usr/bin:/bin',HOME:os.homedir(),LANG:'C.UTF-8',SystemRoot:'C:\\Windows'};
+ const env={PATH:process.env.PATH||'/usr/local/bin:/usr/bin:/bin',HOME:os.homedir(),LANG:'C.UTF-8',SystemRoot:process.env.SystemRoot||'C:\\Windows',TEMP:process.env.TEMP||os.tmpdir(),TMP:process.env.TMP||os.tmpdir()};
+ if(process.platform==='win32')env.SITE_STUDIO_WINDOWS_CANDIDATE=process.env.SITE_STUDIO_WINDOWS_CANDIDATE;
  for(const name of CANARIES)env[name]='synthetic-not-a-secret';
  return env;
 }
@@ -23,21 +24,26 @@ function processRun({argv,init},env){
 async function paneLaunch(pluginRoot,view,options){
  const {readerLaunch}=await import('../hooks/view-contract.mjs');const env=clientEnv();
  // The hook passes the values it reads with $.env.get('PATH') (and, before this fix, SystemRoot).
- return readerLaunch({root:pluginRoot,view,args:[],assets:false,options,offset:0,env:{PATH:env.PATH,SystemRoot:env.SystemRoot}});
+ return readerLaunch({root:pluginRoot,view,args:[],assets:false,options,offset:0,env:{PATH:env.PATH,SystemRoot:env.SystemRoot,TEMP:env.TEMP,TMP:env.TMP,SITE_STUDIO_WINDOWS_CANDIDATE:process.env.SITE_STUDIO_WINDOWS_CANDIDATE}});
 }
 const unused={site_directory:'/nonexistent/site',data_directory:'/nonexistent/state',export_directory:'/nonexistent/export'};
-test('pane reader child receives only PATH and none of the client credential variables',async t=>{
+test('pane reader child receives only the OS allowlist and no credentials or Node startup injection',async t=>{
  const fake=fs.mkdtempSync(path.join(os.tmpdir(),'site-studio-env-'));t.after(()=>fs.rmSync(fake,{recursive:true,force:true}));
  fs.mkdirSync(path.join(fake,'tools'));
+ if(process.platform==='win32')fs.copyFileSync(path.join(root,'tools','windows-pane.ps1'),path.join(fake,'tools','windows-pane.ps1'));
+ const canary=path.join(fake,'preload-ran'),preload=path.join(fake,'poison.cjs');
+ fs.writeFileSync(preload,'require("node:fs").writeFileSync('+JSON.stringify(canary)+',"unexpected loader")');
  fs.writeFileSync(path.join(fake,'tools','site-studio-view.js'),'process.stdout.write(JSON.stringify(Object.keys(process.env).sort()))\n');
  const launch=await paneLaunch(fake,'home',unused);
- assert(launch.argv.includes(path.join(fake,'tools','site-studio-view.js')),'the probe stands in for the reader at its installed path');
- const result=processRun(launch,clientEnv());
+ assert(process.platform==='win32'?JSON.parse(Buffer.from(launch.argv.at(-1),'base64').toString('utf16le')).args.includes(fake+'/tools/site-studio-view.js'):launch.argv.includes(path.join(fake,'tools','site-studio-view.js')),'the probe stands in for the reader at its installed path');
+ const hostileEnv=clientEnv();hostileEnv.NODE_OPTIONS='--require '+JSON.stringify(preload);
+ const result=processRun(launch,hostileEnv);
+ assert.equal(fs.existsSync(canary),false,'ambient NODE_OPTIONS executed before the reader');
  assert.equal(result.exitCode,0,result.stderr);
  const names=JSON.parse(result.stdout);
  const leaked=names.filter(name=>CANARIES.includes(name));
  assert.deepEqual(leaked,[],'client variables reached the pane reader: '+leaked.join(', '));
- assert.deepEqual(names,['PATH'],'pane reader environment names: '+names.join(', '));
+ assert.deepEqual(names.map(n=>n.toUpperCase()).sort(),process.platform==='win32'?['PATH','SITE_STUDIO_WINDOWS_CANDIDATE','SYSTEMROOT','TEMP','TMP']:['PATH'],'pane reader environment names: '+names.join(', '));
 });
 test('the same launch runs the real reader for unopened and live working copies',async t=>{
  const o=fixture(t),options={site_directory:o.sourceRoot,data_directory:o.dataRoot,export_directory:o.exportRoot};

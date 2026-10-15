@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.11 — Windows candidate, not released
+
+- Prepare native SID/DACL private state, canonical Windows root/lock identity and explicit namespace refusals.
+- Prepare a PowerShell pane bootstrap that clears the environment before Node, and a per-user ZIP installer.
+- Windows is gated and unqualified until real normal-user, filesystem, lifecycle, pane and host checks pass. Linux behavior remains covered by its existing suite.
+
 ## 0.1.10 — 2026-10-14
 
 Fixes for the plugin directory's review and for the fresh-user check of 0.1.9. The server, tools, pane and mod behave as in 0.1.9, and no feature was removed:

@@ -1,6 +1,6 @@
 {
   "name": "toolsenabled-site-studio",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "private": true,
   "description": "Standalone local MCP static site editor",
   "type": "commonjs",

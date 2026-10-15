@@ -76,12 +76,13 @@ test('configured folder paths must be absolute before any state is created', t =
   }
 });
 
-test('Windows folder paths require a drive or UNC root', () => {
+test('Windows folder paths require an ordinary local drive root', () => {
   const {absolutePath} = require('../src/options');
   for (const value of ['\\site','/site','C:site','~','~/site','relative']) assert.throws(() => absolutePath(value,'site',path.win32), /absolute path/i);
-  for (const value of ['C:\\site','C:/site','\\\\server\\share\\site','\\\\?\\C:\\site']) assert.equal(absolutePath(value,'site',path.win32),value);
+  for (const value of ['C:\\site','C:/site']) assert.equal(absolutePath(value,'site',path.win32),value);
+  for(const value of ['\\\\server\\share\\site','\\\\?\\C:\\site']) assert.throws(()=>absolutePath(value,'site',path.win32),/Windows paths/);
   assert.throws(() => absolutePath('~/site','site',path.posix), e => /absolute path \(expand ~ in your terminal first\)/.test(e.message) && !/Windows/.test(e.message));
-  assert.throws(() => absolutePath('C:site','site',path.win32), /drive or share on Windows/);
+  assert.throws(() => absolutePath('C:site','site',path.win32), /drive on Windows/);
 });
 
 test('MCP instructions agree with the skill and security boundary for human controls', async t => {

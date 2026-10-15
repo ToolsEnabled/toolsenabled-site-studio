@@ -5,6 +5,7 @@ const fs=require('node:fs');const path=require('node:path');const crypto=require
 const {applyOp,validateModel,hash}=require('./web-model');
 const {MAX_SITE,MAX_FILE,MAX_FILES,allDirectories,checkedPath,importSiteSteps,bytes,fingerprint,within,writeTree}=require('./web-import');
 const {exportSite}=require('./web-publisher');
+const native=require('./native-filesystem');
 const OPENED='Opened working copy (r0)';
 function validLabel(label){return typeof label==='string'&&label===label.trim()&&label.length>0&&label.length<=80&&!RX.labelControls.test(label)&&!RX.systemLabel.test(label);}
 // The rename commits the new state. A later directory-sync error must
@@ -57,7 +58,8 @@ function freeze(value){if(value&&typeof value==='object'){for(const item of Obje
 function* storeSteps(options={}) {
   const allowed=new Set(['sourceRoot','dataRoot','exportRoot','port','host','allowExternal']);for(const key of Object.keys(options))if(!allowed.has(key))throw Error('unknown option: '+key);
   const sourceRoot=checkedPath(absolutePath(options.sourceRoot??process.env.SITE_STUDIO_ROOT??path.join(__dirname,'../site'),'site directory'));
-  const dataRoot=checkedPath(absolutePath(options.dataRoot??process.env.SITE_STUDIO_DATA??path.join(os.homedir(),'.site-studio',hash(sourceRoot).slice(7,23)),'state directory'),{missing:true});
+  native.inspectWindowsPath(sourceRoot,{tree:true});
+  const dataRoot=checkedPath(absolutePath(options.dataRoot??process.env.SITE_STUDIO_DATA??native.defaultDataRoot(hash(native.pathKey(sourceRoot)).slice(7,23)),'state directory'),{missing:true});
   const exportRoot=options.exportRoot===undefined?null:checkedPath(absolutePath(options.exportRoot,'export directory'),{missing:true});
   const installRoot=fs.realpathSync(path.join(__dirname,'..'));
   if(within(dataRoot,installRoot)||exportRoot&&within(exportRoot,installRoot))throw Error('state and export folders must be outside the plugin installation');
@@ -66,7 +68,7 @@ function* storeSteps(options={}) {
   // Site Studio never creates the export parent, so a missing one is refused here before any state exists. An existing
   // destination is rechecked when the human confirms export, which keeps a restart after an export working.
   if(exportRoot){let parent;try{parent=fs.statSync(path.dirname(exportRoot));}catch(e){if(e.code!=='ENOENT')throw e;throw Error('export parent folder must already exist; create it or choose another --export-dir');}if(!parent.isDirectory())throw Error('export parent must be a directory');}
-  fs.mkdirSync(dataRoot,{recursive:true,mode:0o700});checkedPath(dataRoot);const st=fs.statSync(dataRoot);if(process.platform!=='win32'&&(st.mode&0o077))throw Error('state root must have private permissions (chmod 700)');
+  native.privateDirectory(dataRoot);checkedPath(dataRoot);native.privateDirectory(dataRoot,{existing:true,tree:true});
   const releaseLease=require('./state-lease').acquireLease(dataRoot);
   let closed=false,handedOff=false,durabilityWarning=null,undoPruned=null;
   function release(){if(closed)return;closed=true;releaseLease();}

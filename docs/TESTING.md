@@ -1,6 +1,6 @@
 # Verification and reproducible packaging
 
-Linux tested; native Windows not yet supported. Runtime: Node.js 22+. Packaging uses Python 3's standard library. Browser tests require a Chrome or Chromium executable; the product itself does not.
+Linux tested; the gated native Windows 0.1.11 candidate is unqualified. See [WINDOWS.md](WINDOWS.md). Runtime: Node.js 22+. Packaging uses Python 3's standard library. Browser tests require a Chrome or Chromium executable; the product itself does not.
 
 ## Full headless suite
 
@@ -11,20 +11,24 @@ mkdir -p /tmp/ss
 TMPDIR=/tmp/ss SITE_STUDIO_CHROME=/absolute/path/to/chrome env -u DISPLAY node tools/run-tests.js
 ```
 
-`TMPDIR` must be the absolute real path of an existing folder, at most 62 bytes long. The runner checks this before it starts any test and stops with exit status 2 and a message naming the problem; the browser helper repeats the length check when a browser test file is run on its own. The reasons:
+On POSIX, `TMPDIR` must be the absolute real path of an existing folder, at most 62 bytes long. Native Windows validates its TEMP folder with the native custody helper instead of imposing the Unix socket limit. The runner checks this before it starts any test and stops with exit status 2 and a message naming the problem; the browser helper repeats the length check when a browser test file is run on its own. The reasons:
 
 - The tests create their sites and private state under `TMPDIR`, and the working-copy store refuses any path that reaches its files through a symbolic link, by design. A relative `TMPDIR`, or one that goes through a symbolic link, would make about a third of the tests fail with `symbolic link refused`. Use the folder's real path (`realpath` prints it).
 - Chrome creates its lock socket at `<TMPDIR>/<name>.XXXXXX/SingletonSocket`, and a Unix socket path holds at most 107 bytes. With Google Chrome (`com.google.Chrome.XXXXXX`) that allows a `TMPDIR` of up to 66 bytes, measured with Google Chrome 154; Chromium's folder name (`org.chromium.Chromium.XXXXXX`) is four bytes longer, so the runner allows up to 62. With a longer `TMPDIR` Chrome exits at once and the fifteen browser tests fail with a bare `read ECONNRESET`.
 
-Native Windows is not yet supported. The PowerShell form below is kept for future Windows qualification only and has not been run for this release:
+The PowerShell form below is a pending qualification command, not an executed Windows result. Create a private local test folder through the candidate installer/helper first, then set TEMP/TMP to it and set the actual Python executable (maintainer packaging tests only):
 
 ```powershell
+$env:SITE_STUDIO_WINDOWS_CANDIDATE='1'
+$env:TEMP='C:\Users\you\te-winport\site-tests-private'
+$env:TMP=$env:TEMP
+$env:PYTHON='C:\Python313\python.exe'
 $env:SITE_STUDIO_CHROME = 'C:\Program Files\Google\Chrome\Application\chrome.exe'
 Remove-Item Env:DISPLAY -ErrorAction SilentlyContinue
 node tools/run-tests.js
 ```
 
-The runner removes DISPLAY and executes every `test/*.test.js` serially with a 120-second per-file timeout. Browser commands and condition waits have a 15-second budget; explicit performance-test budgets remain unchanged. Navigation waits for the new document’s load event and all asynchronous Fetch interception handlers; unrelated favicon requests cannot overwrite the cookie fixture capture. Browser tests use the DevTools pipe, an isolated temporary profile, disabled background services, and no external pages. The browser and the MCP servers that the shared test helpers start get only `PATH`, the temporary-folder variables, `SystemRoot` on Windows and, for the browser, `HOME` from the runner's environment. In an already isolated container where Chrome's sandbox is unavailable, explicitly set `SITE_STUDIO_CHROME_NO_SANDBOX=1`. An earlier Linux container used for [recorded results](TEST-REPORT.md) required this setting, which adds --no-sandbox and --no-zygote; the 0.1.4, 0.1.5, 0.1.6, 0.1.7, 0.1.8, 0.1.9 and 0.1.10 runs on a Linux host did not. Without it, the harness leaves both sandboxing and the zygote enabled. Browser teardown is bounded and precedes closing any test receiver server. Missing browser prerequisites fail with an actionable message.
+The runner removes DISPLAY and executes every `test/*.test.js` serially with a 120-second per-file timeout. Browser commands and condition waits have a 15-second budget; explicit performance-test budgets remain unchanged. Navigation waits for the new document’s load event and all asynchronous Fetch interception handlers; unrelated favicon requests cannot overwrite the cookie fixture capture. Browser tests use the DevTools pipe, an isolated temporary profile, disabled background services, and no external pages. The browser and the MCP servers that the shared test helpers start get only `PATH`, the temporary-folder variables, `SystemRoot` and the qualification flag on Windows and, for the browser, `HOME` from the runner's environment. In an already isolated container where Chrome's sandbox is unavailable, explicitly set `SITE_STUDIO_CHROME_NO_SANDBOX=1`. An earlier Linux container used for [recorded results](TEST-REPORT.md) required this setting, which adds --no-sandbox and --no-zygote; the 0.1.4, 0.1.5, 0.1.6, 0.1.7, 0.1.8, 0.1.9 and 0.1.10 runs on a Linux host did not. Without it, the harness leaves both sandboxing and the zygote enabled. Browser teardown is bounded and precedes closing any test receiver server. Missing browser prerequisites fail with an actionable message.
 
 Linux FIFO tests have no direct Windows equivalent. SIGHUP lifecycle tests run on POSIX; Windows SIGBREAK wiring has been inspected but has not been executed on Windows. Linux results do not establish Windows compatibility.
 
@@ -63,7 +67,7 @@ Compare their SHA256 hashes. The packager uses an explicit file manifest, reject
 
 `node --test test/views.test.js test/commands.test.js` checks live/stopped saved-state reads, unchanged state/lease bytes, snapshot paging across same-revision changes, missing/wrong configuration, linked/oversized files, terminal controls and native action prompt boundaries. The shared terminal sanitizer is checked against every Unicode control/format/default-ignorable character recognized by the installed Node runtime.
 
-With a separately installed Claude Code 2.1.287 binary, run `claude plugin validate /absolute/site-studio` and `claude plugin test /absolute/site-studio` using a scratch `CLAUDE_CONFIG_DIR`. The tests do not require credentials or model turns. They exercise the actual client's hook facade: no reads at startup, own-runtime argv and limits, no MCP/model calls, snapshot paging, failed/truncated replies, close-during-read and exact action help. The facade does not start real children, so `test/pane-env.test.js` starts the pane's exact reader launch as a real child and checks that only `PATH` reaches it. This does not test native terminal paint or OS permissions. Interactive qualification must separately check every pane, paging, Esc/q, composer focus, absence of permission prompts/model work on views, and one explicitly requested action with the normal permissions.
+With a separately installed Claude Code 2.1.287 binary, run `claude plugin validate /absolute/site-studio` and `claude plugin test /absolute/site-studio` using a scratch `CLAUDE_CONFIG_DIR`. The tests do not require credentials or model turns. They exercise the actual client's hook facade: no reads at startup, own-runtime argv and limits, no MCP/model calls, snapshot paging, failed/truncated replies, close-during-read and exact action help. The facade does not start real children, so `test/pane-env.test.js` starts the pane's exact reader launch as a real child and checks the OS-specific environment allowlist and that a synthetic NODE_OPTIONS preload never executes. Linux permits PATH only; the gated Windows path permits PATH/SystemRoot/TEMP/TMP plus the qualification flag. This does not test native terminal paint or OS permissions. Interactive qualification must separately check every pane, paging, Esc/q, composer focus, absence of permission prompts/model work on views, and one explicitly requested action with the normal permissions.
 
 The ordinary Node suite does not silently substitute for those Claude-specific tests. Codex's local CLI is not a plugin-defined Codex pane; use the documented bang command and preserve that distinction in test reports.
 

@@ -2,15 +2,21 @@
 const RX=require('./patterns');
 const fs=require('node:fs'); const path=require('node:path'); const crypto=require('node:crypto');
 const {hash,indexHtml,validateModel,safePath}=require('./web-model');
+const native=require('./native-filesystem');
 const MAX_FILE=2*1024*1024,MAX_SITE=32*1024*1024,MAX_FILES=1000;
 function checkedPath(value,{missing=false}={}) {
+  if(process.platform==='win32')native.windowsLocalPath(value);
   const resolved=path.resolve(value); const parsed=path.parse(resolved); let current=parsed.root;
+  let existing=parsed.root;const absent=[];
   for(const part of resolved.slice(parsed.root.length).split(path.sep).filter(Boolean)) {
     current=path.join(current,part); let st;
-    try{st=fs.lstatSync(current);}catch(e){if(e.code==='ENOENT'&&missing)continue;throw e;}
+    try{st=fs.lstatSync(current);}catch(e){if(e.code==='ENOENT'&&missing){absent.push(part);continue;}throw e;}
     if(st.isSymbolicLink())throw Error('symbolic link refused');
+    existing=current;
   }
-  return resolved;
+  // On Windows realpath expands existing case/8.3 spellings before comparing
+  // roots or deriving a cooperating export lock. Missing suffixes stay lexical.
+  return process.platform==='win32'?path.join(fs.realpathSync.native(existing),...absent):resolved;
 }
 function readRegular(filename) {
   checkedPath(filename); if(!fs.lstatSync(filename).isFile())throw Error('special file refused: only regular files are supported'); const fd=fs.openSync(filename,fs.constants.O_RDONLY|fs.constants.O_NOFOLLOW|fs.constants.O_NONBLOCK);
@@ -37,9 +43,9 @@ function importSite(root){const steps=importSiteSteps(root);for(;;){const r=step
 function bytes(file){return Buffer.from(file.source,file.encoding==='base64'?'base64':'utf8');}
 function fingerprint(model){return hash(JSON.stringify({directories:allDirectories(model),files:model.files.map(f=>[f.path,hash(bytes(f))]).sort((a,b)=>a[0]<b[0]?-1:a[0]>b[0]?1:0)}));}
 function allDirectories(model){const dirs=new Set(model.directories||[]);for(const f of model.files){const parts=f.path.split('/');parts.pop();while(parts.length){dirs.add(parts.join('/'));parts.pop();}}return [...dirs].sort();}
-function within(a,b){return a===b||a.startsWith(b+path.sep);}
+function within(a,b){a=native.pathKey(a);b=native.pathKey(b);return a===b||a.startsWith(b+path.sep);}
 function writeTree(root,model) {
-  checkedPath(root,{missing:true}); fs.mkdirSync(root,{mode:0o700});
+  checkedPath(root,{missing:true});if(fs.existsSync(root))throw Error('working tree destination already exists');native.privateDirectory(root);
   try {
   for(const directory of allDirectories(model)){if(!safePath(directory))throw Error('unsafe directory');fs.mkdirSync(path.join(root,directory),{recursive:true,mode:0o700});}
   for(const file of model.files){if(!safePath(file.path))throw Error('unsafe path');const dest=path.join(root,file.path);fs.mkdirSync(path.dirname(dest),{recursive:true,mode:0o700});checkedPath(dest,{missing:true});const fd=fs.openSync(dest,'wx',0o600);try{fs.writeFileSync(fd,bytes(file));fs.fsyncSync(fd);}finally{fs.closeSync(fd);}}

@@ -73,9 +73,26 @@ export function parsePage(p, view, offset = 0, snapshot) {
 // env holds the client values the hook read; root is the installed plugin folder.
 // Claude Code sets process.run's init.env over its own environment, so passing a small env never
 // removes the client's variables (API keys, messaging tokens). The reader instead starts through
-// env -i with PATH alone, which the reader needs to find node; native Windows is not supported.
+// env -i with PATH alone on POSIX, or a PowerShell bootstrap that clears the Node child environment on Windows.
 export const READER_ENV = ['PATH'];
+export const windowsRoot=root=>typeof root==='string'&&root.length>3&&root[1]===':'&&(root[2]==='\\'||root[2]==='/');
 export function readerLaunch({root, view, args = [], assets = false, options = {}, offset = 0, snapshot, env = {}}) {
+  if(windowsRoot(root)) {
+    if(env.SITE_STUDIO_WINDOWS_CANDIDATE!=='1')throw Error('Windows pane is an unqualified candidate; explicit qualification opt in is required');
+    const systemRoot=String(env.SystemRoot||'');
+    if(!windowsRoot(systemRoot))throw Error('Windows pane requires an absolute SystemRoot');
+    const reader=[ '--max-old-space-size=384', `${root}/tools/site-studio-view.js`, view, ...args,
+      ...(assets?['--assets']:[]),'--site',String(options.site_directory||''),'--data-dir',String(options.data_directory||''),
+      '--export-dir',String(options.export_directory||''),'--json','--offset',String(offset),...(snapshot===undefined?[]:['--snapshot',snapshot])];
+    // The PowerShell bootstrap clears the environment before starting node.exe.
+    // Never start an environment-scrubbing Node shim under ambient NODE_OPTIONS.
+    const request=JSON.stringify({root,args:reader,env:{PATH:env.PATH||'',SystemRoot:systemRoot,TEMP:env.TEMP||'',TMP:env.TMP||''}});
+    // UTF-16LE base64 without Node/Buffer, which the hook sandbox need not expose.
+    const alphabet='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';const bytes=[];
+    for(let i=0;i<request.length;i++){const c=request.charCodeAt(i);bytes.push(c&255,c>>>8);}
+    let encoded='';for(let i=0;i<bytes.length;i+=3){const n=(bytes[i]<<16)|((bytes[i+1]||0)<<8)|(bytes[i+2]||0);encoded+=alphabet[(n>>>18)&63]+alphabet[(n>>>12)&63]+(i+1<bytes.length?alphabet[(n>>>6)&63]:'=')+(i+2<bytes.length?alphabet[n&63]:'=');}
+    return {argv:[systemRoot+'/System32/WindowsPowerShell/v1.0/powershell.exe','-NoLogo','-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',`${root}/tools/windows-pane.ps1`,'-RequestBase64',encoded],init:{cwd:root,timeoutMs:5000}};
+  }
   const argv = ['/usr/bin/env', '-i', ...READER_ENV.map(name => name + '=' + (env[name] || '')),
     'node', '--max-old-space-size=384', `${root}/tools/site-studio-view.js`, view, ...args,
     ...(assets ? ['--assets'] : []),

@@ -3,6 +3,7 @@ const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypt
 const {absolutePath}=require('./options');
 const os=require('node:os'),{hash,validateModel}=require('./web-model');
 const {checkedPath,within}=require('./web-import');
+const native=require('./native-filesystem');
 const MAX_STATE=128*1024*1024;
 function fail(code){throw Error(code);}
 function readSnapshot(sourceRoot,dataRoot,allowExternal){
@@ -12,6 +13,7 @@ function readSnapshot(sourceRoot,dataRoot,allowExternal){
   if(!fs.lstatSync(sourceRoot).isDirectory())fail('VIEW_STATE');
   if(within(sourceRoot,dataRoot)||within(dataRoot,sourceRoot)||within(dataRoot,path.resolve(__dirname,'..')))fail('VIEW_STATE');
   const dir=fs.lstatSync(dataRoot);if(!dir.isDirectory()||process.platform!=='win32'&&(dir.mode&0o077))fail('VIEW_STATE');
+  native.privateDirectory(dataRoot,{existing:true,tree:true});
   file=checkedPath(path.join(dataRoot,'state.json'));
   fd=fs.openSync(file,fs.constants.O_RDONLY|fs.constants.O_NOFOLLOW|fs.constants.O_NONBLOCK);
   const before=fs.fstatSync(fd);
@@ -41,7 +43,7 @@ async function view(options){
     ||args.some(v=>typeof v!=='string'||v.length>8192)||typeof allowExternal!=='boolean')fail('VIEW_ARGUMENTS');
  const sourceRoot=options.sourceRoot??process.env.SITE_STUDIO_ROOT??path.join(__dirname,'../site');
  // The server hashes the resolved site path (studio-store.js), so a trailing separator names the same folder.
- const dataRoot=options.dataRoot??process.env.SITE_STUDIO_DATA??path.join(os.homedir(),'.site-studio',hash(path.resolve(String(sourceRoot))).slice(7,23));
+ const dataRoot=options.dataRoot??process.env.SITE_STUDIO_DATA??native.defaultDataRoot(hash(native.pathKey(checkedPath(String(sourceRoot),{missing:true}))).slice(7,23));
  const exportRoot=options.exportRoot;
  try{absolutePath(sourceRoot,'site');absolutePath(dataRoot,'state');if(exportRoot!==undefined)absolutePath(exportRoot,'export');}catch{fail('VIEW_CONFIG');}
  if(!['page','find','changes'].includes(view)&&args.length)fail('VIEW_ARGUMENTS');

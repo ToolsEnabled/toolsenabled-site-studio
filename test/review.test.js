@@ -14,7 +14,7 @@ test('CSS read scans a 2 MiB brace-free tail within two seconds',()=>{
 });
 
 test('PowerShell registration escapes every single-quote delimiter',()=>{
- const r=spawnSync(process.execPath,['--input-type=module','-e',`Object.defineProperty(process,'platform',{value:'win32'});const {clientConfig}=await import('./tools/mcp-config.mjs');process.stdout.write(clientConfig('codex',{site:"/tmp/Bob‘’‚‛'s site"}));`],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
+ const r=spawnSync(process.execPath,['--input-type=module','-e',`Object.defineProperty(process,'platform',{value:'win32'});const {clientConfig}=await import('./tools/mcp-config.mjs');process.stdout.write(clientConfig('codex',{appRoot:"C:/apps/site-studio",site:"C:/work/Bob‘’‚‛'s site"}));`],{cwd:path.join(__dirname,'..'),encoding:'utf8'});
  assert.equal(r.status,0,r.stderr);assert(r.stdout.includes("Bob‘‘’’‚‚‛‛''s site"),r.stdout);
 });
 

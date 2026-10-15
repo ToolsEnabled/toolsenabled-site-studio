@@ -21,8 +21,9 @@ function processIdentity(pid) {
       const systemRoot=process.env.SystemRoot;
       if(typeof systemRoot!=='string'||!path.win32.isAbsolute(systemRoot)||path.win32.parse(systemRoot).root.length===1)throw Error('SystemRoot must be a fully qualified Windows directory');
       const executable=path.win32.join(systemRoot,'System32','WindowsPowerShell','v1.0','powershell.exe');
-      const script='$ErrorActionPreference="Stop"; $p=Get-Process -Id '+pid+' -ErrorAction SilentlyContinue; if ($null -eq $p) { "gone" } else { $p.StartTime.ToUniversalTime().Ticks.ToString() }';
-      const value=execFileSync(executable,['-NoLogo','-NoProfile','-NonInteractive','-Command',script],{encoding:'utf8',timeout:5000,windowsHide:true,stdio:['ignore','pipe','pipe']}).trim();
+      const script='$ErrorActionPreference="Stop"; $env:PSModulePath=$PSHOME+"\\Modules"; $p=Get-Process -Id '+pid+' -ErrorAction SilentlyContinue; if ($null -eq $p) { "gone" } else { $p.StartTime.ToUniversalTime().Ticks.ToString() }';
+      const env={SystemRoot:systemRoot,windir:systemRoot};for(const name of ['TEMP','TMP'])if(process.env[name])env[name]=process.env[name];
+      const value=execFileSync(executable,['-NoLogo','-NoProfile','-NonInteractive','-Command',script],{encoding:'utf8',timeout:5000,windowsHide:true,env,maxBuffer:16384,stdio:['ignore','pipe','pipe']}).trim();
       if(value==='gone')return null;
       if(!value||Array.from(value).some(c=>!('0123456789'.includes(c))))throw Error('process start time unavailable');
       return {kind:'win32',startTime:value};
@@ -54,6 +55,7 @@ function sameFile(file,stat) {try{const now=fs.lstatSync(file);return now.isFile
 function identityScope() {
   try {
     const scope={kind:process.platform,hostname:os.hostname(),pidNamespace:process.platform==='linux'?fs.readlinkSync('/proc/self/ns/pid'):null};
+    if(process.platform==='win32')scope.sid=require('./native-filesystem').windowsIdentity().sid;
     if(!scope.hostname||process.platform==='linux'&&!scope.pidNamespace)throw Error('scope unavailable');
     return scope;
   } catch(e) {throw Error('Cannot verify state lease owner scope: '+(e.code||e.message));}
@@ -61,7 +63,7 @@ function identityScope() {
 function ownerAlive(owner,scope,file) {
   // A PID (even with the same boot ID) has meaning only in its original scope.
   // Missing scope in an older lease is not proof that its owner is gone.
-  if(!owner.scope||owner.scope.kind!==scope.kind||owner.scope.hostname!==scope.hostname||owner.scope.pidNamespace!==scope.pidNamespace||owner.process&&owner.process.kind!==scope.kind)throw Error('Cannot verify state lease owner scope. Lease '+file+' (PID '+owner.pid+'). Manually verify all writers on the original host and PID namespace have stopped before removing this lease.');
+  if(!owner.scope||owner.scope.kind!==scope.kind||owner.scope.hostname!==scope.hostname||owner.scope.pidNamespace!==scope.pidNamespace||scope.kind==='win32'&&owner.scope.sid!==scope.sid||owner.process&&owner.process.kind!==scope.kind)throw Error('Cannot verify state lease owner scope. Lease '+file+' (PID '+owner.pid+'). Manually verify all writers on the original host and PID namespace have stopped before removing this lease.');
   if(!owner.process)throw Error('Cannot verify state lease owner creation identity. Lease '+file+' (PID '+owner.pid+'). Manually verify all writers have stopped before removing this lease.');
   let current;
   try{current=processIdentity(owner.pid);}catch(e){throw Error(e.message+'; lease '+file+' (PID '+owner.pid+').');}
@@ -69,6 +71,7 @@ function ownerAlive(owner,scope,file) {
   return current.kind===owner.process.kind&&current.startTime===owner.process.startTime&&current.bootId===owner.process.bootId;
 }
 function acquireLease(directory) {
+  if(process.platform==='win32')require('./native-filesystem').privateDirectory(directory,{existing:true,tree:true});
   const file=path.join(directory,'lease.json');
   const owner={pid:process.pid,entry:'site-studio',nonce:crypto.randomBytes(16).toString('hex'),process:processIdentity(process.pid),scope:identityScope()};
   if(!owner.process)throw Error('Cannot determine this process state lease identity');

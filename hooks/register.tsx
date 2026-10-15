@@ -1,5 +1,5 @@
 import type { Register } from 'claude-code'
-import {LIMIT, HELP, parsePage, parseRequest, fitLine, readerLaunch} from './view-contract.mjs'
+import {LIMIT, HELP, parsePage, parseRequest, fitLine, readerLaunch, windowsRoot} from './view-contract.mjs'
 
 const PANE = 'site-studio-view'
 let serial = 0, loading = false, error = '', selected = 'home'
@@ -18,8 +18,9 @@ async function load($: any, options: any, offset = 0, snapshot?: string) {
       page={view,rev:0,snapshot:'0'.repeat(64),offset,total:HELP.length,rows:HELP.slice(offset,offset+LIMIT),nextOffset:offset+LIMIT<HELP.length?offset+LIMIT:null}
       return
     }
-    const launch = readerLaunch({root: $.plugin.root, view, args: request.args, assets: request.assets, options, offset, snapshot,
-      env: {PATH: await $.env.get('PATH') || ''}})
+    const readerEnv:any={PATH: await $.env.get('PATH') || ''}
+    if(windowsRoot($.plugin.root))for(const name of ['SystemRoot','TEMP','TMP','SITE_STUDIO_WINDOWS_CANDIDATE'])readerEnv[name]=await $.env.get(name)||''
+    const launch = readerLaunch({root: $.plugin.root, view, args: request.args, assets: request.assets, options, offset, snapshot,env:readerEnv})
     const result = await $.process.run(launch.argv, launch.init)
     if (mine !== serial) return
     if (result.exitCode !== 0 || result.isStdoutTruncated || result.isStderrTruncated) {

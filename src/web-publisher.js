@@ -5,12 +5,13 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const {hash} = require('./web-model');
 const {checkedPath,within,writeTree,importSite,fingerprint} = require('./web-import');
+const native=require('./native-filesystem');
 
 function exportSite({sourceRoot,dataRoot,exportRoot,originalFingerprint,model,onExport}) {
   if (!exportRoot) throw Error('No export destination configured. Restart with --export-dir.');
-  checkedPath(sourceRoot);
-  checkedPath(dataRoot);
-  checkedPath(exportRoot,{missing:true});
+  sourceRoot=checkedPath(sourceRoot);
+  dataRoot=checkedPath(dataRoot);
+  exportRoot=checkedPath(exportRoot,{missing:true});
   if (within(exportRoot,dataRoot) || within(dataRoot,exportRoot) ||
       exportRoot !== sourceRoot && (within(exportRoot,sourceRoot) || within(sourceRoot,exportRoot))) {
     throw Error('overlapping export root refused');
@@ -21,9 +22,9 @@ function exportSite({sourceRoot,dataRoot,exportRoot,originalFingerprint,model,on
 
   // Independent state directories can refer to the same original. Serialize
   // export across them, then compare source bytes under that exclusive lease.
-  const lock = path.join(parent,'.site-studio-export-' + hash(exportRoot).slice(7,31) + '.lock');
+  const lock = path.join(parent,'.site-studio-export-' + hash(native.pathKey(exportRoot)).slice(7,31) + '.lock');
   let fd;
-  try { fd = fs.openSync(lock,'wx',0o600); }
+  try { fd = native.privateFile(lock); }
   catch (e) {
     if (e.code === 'EEXIST') throw Error('export lease exists; stop the other exporter or verify its PID is gone before removing ' + path.basename(lock));
     throw e;
@@ -85,7 +86,7 @@ function exportPreflight({sourceRoot,dataRoot,exportRoot,originalFingerprint}) {
     out.pathsSafe=true;const parent=checkedPath(path.dirname(exportRoot));
     out.parentExists=fs.statSync(parent).isDirectory();out.destinationExists=fs.existsSync(exportRoot);
     out.replacesOriginal=exportRoot===sourceRoot;
-    const lock=path.join(parent,'.site-studio-export-'+hash(exportRoot).slice(7,31)+'.lock');
+    const lock=path.join(parent,'.site-studio-export-'+hash(native.pathKey(exportRoot)).slice(7,31)+'.lock');
     try{fs.lstatSync(lock);out.lockPresent=true;}catch(e){if(e.code!=='ENOENT')throw e;out.lockPresent=false;}
     out.originalDrift=fingerprint(importSite(sourceRoot))!==originalFingerprint;
     out.ready=out.parentExists&&!out.lockPresent&&!out.originalDrift&&(!out.destinationExists||out.replacesOriginal);
