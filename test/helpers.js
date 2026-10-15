@@ -16,7 +16,7 @@ function privateWrite(target,data,options) {
 }
 function publicReadFixture(target) {
   if(process.platform!=='win32'){fs.chmodSync(target,0o755);return;}
-  const script='[Console]::InputEncoding=New-Object Text.UTF8Encoding($false);$ErrorActionPreference="Stop";$p=[Console]::In.ReadToEnd();$acl=Get-Acl -LiteralPath $p;$rule=New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier("S-1-5-32-545")),[Security.AccessControl.FileSystemRights]::ReadAndExecute,[Security.AccessControl.AccessControlType]::Allow);[void]$acl.AddAccessRule($rule);Set-Acl -LiteralPath $p -AclObject $acl';
+  const script='[Console]::InputEncoding=New-Object Text.UTF8Encoding($false);$ErrorActionPreference="Stop";$p=[Console]::In.ReadToEnd();$directory=[IO.Directory]::Exists($p);$acl=if($directory){[IO.Directory]::GetAccessControl($p,[Security.AccessControl.AccessControlSections]::Access)}else{[IO.File]::GetAccessControl($p,[Security.AccessControl.AccessControlSections]::Access)};$rule=New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier("S-1-5-32-545")),[Security.AccessControl.FileSystemRights]::ReadAndExecute,[Security.AccessControl.AccessControlType]::Allow);[void]$acl.AddAccessRule($rule);if($directory){[IO.Directory]::SetAccessControl($p,$acl)}else{[IO.File]::SetAccessControl($p,$acl)}';
   require('node:child_process').execFileSync(path.win32.join(process.env.SystemRoot,'System32','WindowsPowerShell','v1.0','powershell.exe'),['-NoLogo','-NoProfile','-NonInteractive','-Command',script],{input:target,encoding:'utf8',env:childEnv(),timeout:15000,windowsHide:true});
 }
 function fixture(t) {
