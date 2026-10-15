@@ -41,15 +41,15 @@ async function view(options){
  if(!VIEWS.includes(view)||!Number.isSafeInteger(offset)||offset<0||offset>1000||offset%LIMIT!==0
     ||snapshot!==undefined&&!snapshotId(snapshot)||offset>0&&!snapshot||!Array.isArray(args)||args.length>2
     ||args.some(v=>typeof v!=='string'||v.length>8192)||typeof allowExternal!=='boolean')fail('VIEW_ARGUMENTS');
+ if(!['page','find','changes'].includes(view)&&args.length)fail('VIEW_ARGUMENTS');
+ let result,rows;
+ if(view==='help'){rows=HELP;result={snapshot:hash('help').slice(7),state:null};}
+ else{
  const sourceRoot=options.sourceRoot??process.env.SITE_STUDIO_ROOT??path.join(__dirname,'../site');
  // The server hashes the resolved site path (studio-store.js), so a trailing separator names the same folder.
  const dataRoot=options.dataRoot??process.env.SITE_STUDIO_DATA??native.defaultDataRoot(hash(native.pathKey(checkedPath(String(sourceRoot),{missing:true}))).slice(7,23));
  const exportRoot=options.exportRoot;
  try{absolutePath(sourceRoot,'site');absolutePath(dataRoot,'state');if(exportRoot!==undefined)absolutePath(exportRoot,'export');}catch{fail('VIEW_CONFIG');}
- if(!['page','find','changes'].includes(view)&&args.length)fail('VIEW_ARGUMENTS');
- let result,rows;
- if(view==='help'){rows=HELP;result={snapshot:hash('help').slice(7),state:null};}
- else{
   try{result=readSnapshot(sourceRoot,dataRoot,allowExternal);}
   catch(e){
    if(view!=='doctor')throw e;

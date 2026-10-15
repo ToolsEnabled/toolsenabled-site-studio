@@ -48,3 +48,24 @@ test('help works before configuration and terminal sanitization covers Unicode f
   const c=String.fromCodePoint(n);if(/[\p{Cc}\p{Cf}\p{Default_Ignorable_Code_Point}\p{Zl}\p{Zp}]/u.test(c))assert.equal(safeText(c),'�','U+'+n.toString(16));
  }
 });
+
+test('help performs no path, native identity or filesystem metadata work before configuration',async()=>{
+ // Warm both loaders before installing traps: module acquisition is not the
+ // runtime path-resolution behaviour this check is intended to measure.
+ const {view}=require('../src/site-view');
+ await import('../hooks/view-contract.mjs');
+ const native=require('../src/native-filesystem'),calls=[],restore=[];
+ const trap=name=>()=>{calls.push(name);throw Error('Unexpected help effect: '+name);};
+ const patch=(object,key,label)=>{const descriptor=Object.getOwnPropertyDescriptor(object,key);assert.equal(typeof descriptor.value,'function');Object.defineProperty(object,key,{...descriptor,value:trap(label)});restore.push(()=>Object.defineProperty(object,key,descriptor));};
+ const options={view:'help'};
+ for(const key of ['sourceRoot','dataRoot','exportRoot'])Object.defineProperty(options,key,{get:trap('options.'+key)});
+ let page;
+ try{
+  for(const key of ['defaultDataRoot','windowsIdentity','privateDirectory','inspectWindowsPath'])patch(native,key,'native.'+key);
+  for(const key of ['statSync','lstatSync','realpathSync','accessSync','existsSync','openSync','readFileSync','readdirSync'])patch(fs,key,'fs.'+key);
+  page=await view(options);
+ }finally{for(const undo of restore.reverse())undo();}
+ assert.deepEqual(calls,[]);
+ assert.equal(page.schema,'site-studio/view/1');assert.equal(page.view,'help');assert.equal(page.rev,0);
+ assert(page.rows.join('\n').includes('site-studio home'));assert.equal(page.offset,0);assert.equal(page.limit,8);
+});
