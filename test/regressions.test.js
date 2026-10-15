@@ -11,5 +11,24 @@ test('fresh recursive private copy and restart',async t=>{const opts=fixture(t);
   assert.equal(app.model.files.length,4); const before=fs.readFileSync(path.join(opts.sourceRoot,'index.html')); app.edit(textOp(app.model)); assert.deepEqual(fs.readFileSync(path.join(opts.sourceRoot,'index.html')),before); assert.match(fs.readFileSync(path.join(app.workingRoot,'index.html'),'utf8'),/Changed/); await app.close(); app=createCoordinator({...opts,port:0}); assert.equal(app.model.rev,1); await app.close();});
 test('checkpoints and human undo are forward revisioned',async t=>{const app=require('../web-server').createCoordinator({...fixture(t),port:0}); t.after(()=>app.close()); app.checkpoint('Start',0); app.edit(textOp(app.model)); app.human('undo',{expectedRev:1}); assert.equal(app.model.rev,2); assert.match(app.model.files[0].source,/Home/); app.human('redo',{expectedRev:2}); assert.equal(app.model.rev,3); assert.match(app.model.files[0].source,/Changed/); app.human('restore',{expectedRev:3,label:'Start'}); assert.equal(app.model.rev,4);});
 test('export needs human confirmation and preserves binary bytes',async t=>{const o=fixture(t); const app=require('../web-server').createCoordinator({...o,port:0}); t.after(()=>app.close()); app.edit(textOp(app.model)); assert.throws(()=>app.human('export',{expectedRev:1}),/confirm/i); assert.equal(fs.existsSync(o.exportRoot),false); app.human('export',{expectedRev:1,confirmed:true}); assert.match(fs.readFileSync(path.join(o.exportRoot,'index.html'),'utf8'),/Changed/); assert.deepEqual(fs.readFileSync(path.join(o.exportRoot,'nested/pixel.png')),fs.readFileSync(path.join(o.sourceRoot,'nested/pixel.png')));});
-test('second writer refuses and source symlink refuses',async t=>{const o=fixture(t); const {createCoordinator}=require('../web-server'); const app=createCoordinator({...o,port:0}); t.after(()=>app.close()); assert.throws(()=>createCoordinator({...o,port:0}),/lease|already|writer/i); await app.close(); fs.symlinkSync(path.join(o.root,'outside'),path.join(o.sourceRoot,'escape')); assert.throws(()=>createCoordinator({...o,dataRoot:path.join(o.root,'other')}),/link/i);});
+test('second writer refuses and source leaf symlink refuses without changing its target',async t=>{
+ const o=fixture(t),{createCoordinator}=require('../web-server');const app=createCoordinator({...o,port:0});t.after(()=>app.close());
+ assert.throws(()=>createCoordinator({...o,port:0}),/lease|already|writer/i);await app.close();
+ const target=path.join(o.root,'outside.html'),before=Buffer.from('<h1>owned canary must not change</h1>');fs.writeFileSync(target,before);
+ try{fs.symlinkSync(target,path.join(o.sourceRoot,'escape.html'));}catch(error){
+  if(process.platform==='win32'&&['EPERM','EACCES'].includes(error.code)){
+   t.diagnostic('Actual Windows leaf-symlink creation refused: '+error.code+'; no privilege or machine policy changed');
+   assert.deepEqual(fs.readFileSync(target),before);t.skip('Leaf-symlink creation unavailable to this token; native junction-ancestor counterpart is separate');return;
+  }throw error;
+ }
+ assert(fs.lstatSync(path.join(o.sourceRoot,'escape.html')).isSymbolicLink());
+ assert.throws(()=>createCoordinator({...o,dataRoot:path.join(o.root,'other')}),process.platform==='win32'?/Windows private-folder check failed/:/link/i);
+ assert.deepEqual(fs.readFileSync(target),before);
+});
+test('native Windows junction ancestor refuses before selecting an outside canary file',{skip:process.platform!=='win32'},t=>{
+ const o=fixture(t),outside=path.join(o.root,'outside-directory'),before=Buffer.from('<h1>owned junction canary</h1>');fs.mkdirSync(outside);fs.writeFileSync(path.join(outside,'selected.html'),before);
+ const junction=path.join(o.sourceRoot,'redirected');fs.symlinkSync(outside,junction,'junction');assert(fs.lstatSync(junction).isSymbolicLink());
+ assert.throws(()=>require('../web-server').createCoordinator(o),/Windows private-folder check failed/);
+ assert.deepEqual(fs.readFileSync(path.join(outside,'selected.html')),before);assert.deepEqual(fs.readdirSync(outside),['selected.html']);
+});
 test('preview Host Origin guards and CSP',async t=>{const app=require('../web-server').createCoordinator({...fixture(t),port:0}); t.after(()=>app.close()); const a=await app.listen(); const base=`http://127.0.0.1:${a.port}`; assert.equal(await new Promise(resolve=>require('node:http').get(base+'/api/status',{headers:{Host:'evil.test'}},r=>{r.resume();resolve(r.statusCode);})),403); assert.equal((await fetch(base+'/api/status',{headers:{Origin:'https://evil.test'}})).status,403); const preview=await require('./session-helper').previewSession(app);const r=await fetch(preview.url+'/index.html',{headers:preview.headers}); assert.equal(r.status,200); assert.match(r.headers.get('content-security-policy'),/script-src 'none'/); assert.match(r.headers.get('content-security-policy'),/sandbox/); assert.equal((await fetch(base+'/api/control',{method:'POST',headers:{'content-type':'application/json'},body:'{"action":"export","confirmed":true,"expectedRev":0}'})).status,403);});

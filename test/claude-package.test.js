@@ -34,7 +34,7 @@ test('Claude folder options launch literal paths and preserve Codex sample defau
   });
   const messages = [{jsonrpc:'2.0',id:1,method:'initialize',params:{protocolVersion:'2025-06-18',capabilities:{},clientInfo:{name:'package-test',version:'1'}}}, {jsonrpc:'2.0',id:2,method:'tools/list'}, {jsonrpc:'2.0',id:3,method:'tools/call',params:{name:'web_pages',arguments:{}}}];
   const env = {...process.env}; delete env.DISPLAY;
-  const p = spawnSync(process.execPath, args, {env, input:messages.map(m => JSON.stringify(m)).join('\n')+'\n', encoding:'utf8', timeout:5000});
+  const p = spawnSync(process.execPath, args, {env, input:messages.map(m => JSON.stringify(m)).join('\n')+'\n', encoding:'utf8', timeout:process.platform==='win32'?30000:5000});
   assert.equal(p.status, 0, p.stderr);
   const responses = p.stdout.trim().split('\n').map(s => JSON.parse(s));
   assert.equal(responses.length, 3);

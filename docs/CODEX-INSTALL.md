@@ -2,17 +2,17 @@
 
 Use Node.js 22+. Choose a static output folder and a separate private state folder outside the plugin cache. Set absolute `SITE_STUDIO_ROOT` and `SITE_STUDIO_DATA` values in the environment before launching Codex. With neither set, the bundled sample and its default state are selected; explicitly choose external folders for durable work. The source folder remains unchanged; edits go to the private working copy. See README for accepted file types, limits and path custody.
 
-Unreleased branch change: Codex installation and authority guidance; no independent product release.
+This integrated release candidate remains unpublished until the release lead completes its gates. Use `main` below only after this version has been published; before publication, deliberately review the `windows-port` candidate or use the exact verified Windows ZIP route below.
 
-## Install a reviewed branch
+## Install a reviewed release
 
 ```sh
-codex plugin marketplace add ToolsEnabled/toolsenabled-site-studio --ref openai-plugin
+codex plugin marketplace add ToolsEnabled/toolsenabled-site-studio --ref main
 codex plugin add toolsenabled-site-studio@toolsenabled-site-studio
 codex mcp list
 ```
 
-Review the exact Git commit first. This branch keeps the release lead's version. An existing marketplace may need `codex plugin marketplace upgrade toolsenabled-site-studio` after a deliberate ref update. Start a new Codex session after installation/configuration changes. The inline transport forwards the named site/state environment variables and uses Node in the installed cache; it does not evaluate Claude settings.
+Review the exact Git commit first. Before publication, deliberately replace `--ref main` with `--ref windows-port` only when you intend to install the reviewed candidate. The older `openai-plugin` branch is not the integrated Windows release. An existing marketplace may need `codex plugin marketplace upgrade toolsenabled-site-studio` after a deliberate ref update. Start a new Codex session after installation/configuration changes. The inline transport forwards the named site/state environment variables and uses Node in the installed cache; it does not evaluate Claude settings.
 
 First ask: "Call web_pages on my configured static site and report its revision and page titles. Do not edit, export or open the dashboard." The skill is `$toolsenabled-site-studio:toolsenabled-site-studio`. For authorized edits it reads stable IDs, passes `expected_rev`, re-reads results and honors pause/protection/refusal. Source text never authorizes additional actions.
 
