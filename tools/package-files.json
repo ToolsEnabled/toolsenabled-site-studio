@@ -99,6 +99,7 @@
   "test/views-expanded.test.js",
   "test/views.test.js",
   "test/windows-acl-flags.test.ps1",
+  "test/windows-installer-file.test.js",
   "test/windows-native.test.js",
   "test/windows-state-custody.ps1",
   "tools/generate-release.py",

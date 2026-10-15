@@ -5,6 +5,9 @@ $ErrorActionPreference='Stop'
 $env:PSModulePath="$PSHOME\Modules"
 $request=[Console]::In.ReadToEnd()
 if($request.Length -gt 16384){throw 'Request too large'}
+# Windows PowerShell 5.1 may put one UTF-8 transport marker on native stdin.
+# Do not trim additional or interior markers, or change the original size bound.
+if($request.Length -gt 0 -and $request[0] -eq [char]0xfeff){$request=$request.Substring(1)}
 $request=$request|ConvertFrom-Json
 $sid=[Security.Principal.WindowsIdentity]::GetCurrent().User.Value
 $trusted=@($sid,'S-1-5-18','S-1-5-32-544')
