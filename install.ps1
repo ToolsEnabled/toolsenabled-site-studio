@@ -10,8 +10,11 @@ $manifest=Join-Path $source 'MANIFEST.sha256'
 if(-not (Test-Path -LiteralPath $manifest -PathType Leaf)){throw 'Install from the checksum-verified extracted release ZIP, which includes MANIFEST.sha256.'}
 if(-not $Prefix){$Prefix=Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)) 'ToolsEnabled\SiteStudio\0.1.11'}
 $node=(Get-Command node.exe -CommandType Application -ErrorAction Stop|Select-Object -First 1).Source
-$major=[int]((& $node -p 'process.versions.node.split(".")[0]').Trim())
-if($LASTEXITCODE -ne 0 -or $major -lt 22){throw 'Node.js 22 or newer required'}
+# Windows PowerShell 5.1 strips embedded quotes from legacy native arguments.
+# Read the version directly so no JavaScript quoting crosses that boundary.
+$nodeVersion=(& $node --version|Out-String).Trim()
+if($LASTEXITCODE -ne 0 -or $nodeVersion -notmatch '^v([0-9]+)\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$'){throw 'Node.js 22 or newer required'}
+if([int]$Matches[1] -lt 22){throw 'Node.js 22 or newer required'}
 $helper=Join-Path $source 'src\windows-private.ps1'
 $ps=Join-Path ([Environment]::SystemDirectory) 'WindowsPowerShell\v1.0\powershell.exe'
 function Native-Operation([string]$operation,[string]$target){
